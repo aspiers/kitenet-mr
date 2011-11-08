@@ -1416,7 +1416,7 @@ sub loadconfig {
 			}
 		}
 		else {
-			die "$f line $line: parse error\n";
+			die "$f line $line: parse error at:\n\n$_\n";
 		}
 	}
 
