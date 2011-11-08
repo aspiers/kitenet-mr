@@ -530,7 +530,7 @@ use constant {
 
 # configurables
 my $config_overridden=0;
-my $verbosity=2;
+my $verbosity=length $ENV{MR_DEFAULT_VERBOSITY} ? $ENV{MR_DEFAULT_VERBOSITY} : 2;
 my $quiet=0;
 my $stats=0;
 my $insecure=0;
