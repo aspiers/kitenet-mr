@@ -247,13 +247,15 @@ Control verbosity level.  Defaults to 2, or the value of the
 C<MR_DEFAULT_VERBOSITY> environment variable if set.  If the option is
 used with no value for C<N> then c<N> defaults to 4.
 
+Level 0 will suppress mr's usual output, as well as any output from
+commands that are run (including stderr output). If a command fails,
+the output will be shown.
+
 =item -q
 
 =item --quiet
 
-Be quiet. This suppresses mr's usual output, as well as any output from
-commands that are run (including stderr output). If a command fails,
-the output will be shown.
+Equivalent to C<-v0>.  Overrides any C<-v> option.
 
 =item -k
 
@@ -842,7 +844,7 @@ sub action {
 			$s=~s/^\Q$fulldir\E\/?//;
 			$actionmsg="mr $action: $fulldir (in subdir $s)";
 		}
-		print "$actionmsg\n" unless $quiet;
+		debug(1, "$actionmsg\n");
 
 		my $hookret=hook("pre_$action", $topdir, $subdir);
 		return $hookret if $hookret != OK;
@@ -852,7 +854,7 @@ sub action {
 				my $sh=shift;
 				my $cwd = getcwd();
 				my $ret;
-				if ($quiet) {
+				if ($verbosity == 0) {
 					my $output = qx/$sh 2>&1/;
 					$ret = $?;
 					if ($ret != 0) {
@@ -936,7 +938,7 @@ sub hook {
 	return OK unless defined $command;
 	my $ret=runsh $hook, $topdir, $subdir, $command, [], sub {
 			my $sh=shift;
-			if ($quiet) {
+			if ($verbosity == 0) {
 				my $output = qx/$sh 2>&1/;
 				my $ret = $?;
 				if ($ret != 0) {
@@ -1041,7 +1043,7 @@ sub record {
 
 	if ($ret == OK) {
 		push @ok, $dir;
-		print "\n" unless $quiet;
+		print "\n" unless $verbosity == 0;
 	}
 	elsif ($ret == FAILED) {
 		if ($interactive) {
@@ -1050,7 +1052,7 @@ sub record {
 			system((getpwuid($<))[8], "-i");
 		}
 		push @failed, $dir;
-		print "\n" unless $quiet;
+		print "\n" unless $verbosity == 0;
 	}
 	elsif ($ret == SKIPPED) {
 		push @skipped, $dir;
@@ -1072,10 +1074,10 @@ sub showstats {
 		showstat($#ok+1, "ok", "ok"),
 		showstat($#failed+1, "failed", "failed"),
 		showstat($#skipped+1, "skipped", "skipped"),
-	).")\n" unless $quiet;
+	).")\n" unless $verbosity == 0;
 	if ($stats) {
 		if (@skipped) {
-			print "mr $action: (skipped: ".join(" ", @skipped).")\n" unless $quiet;
+			print "mr $action: (skipped: ".join(" ", @skipped).")\n" unless $verbosity == 0;
 		}
 		if (@failed) {
 			awarn($action, "(failed: " . join(" ", @failed) . ")");
@@ -1443,7 +1445,7 @@ sub loadconfig {
 			return;
 		}
 
-		print "mr: loading config $f\n" if $verbose;
+		debug(4, "mr: loading config $f\n");
 		open($in, "<", $f) || die "mr: open $f: $!\n";
 	}
 	my @lines=<$in>;
@@ -1961,6 +1963,8 @@ sub getopts {
 		"j|jobs:i" => \$jobs,
 		"t|trust-all" => \$trust_all,
 	);
+	$verbosity = 0 if $quiet;
+
 	$ENV{MR_REPOS} = $repos;
 
 	if (! $result || @ARGV < 1) {
