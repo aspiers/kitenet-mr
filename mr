@@ -589,7 +589,7 @@ sub rcs_test {
 	chomp $rcs;
 	if ($rcs=~/\n/s) {
 		$rcs=~s/\n/, /g;
-		print STDERR "mr $action: found multiple possible repository types ($rcs) for ".fulldir($topdir, $subdir)."\n";
+		warn "mr $action: found multiple possible repository types ($rcs) for ".fulldir($topdir, $subdir)."\n";
 		return undef;
 	}
 	if (! length $rcs) {
@@ -652,18 +652,18 @@ sub action {
 			my $ret=system($test);
 			if ($ret != 0) {
 				if (($? & 127) == 2) {
-					print STDERR "mr $action: interrupted\n";
+					warn "mr $action: interrupted\n";
 					return ABORT;
 				}
 				elsif ($? & 127) {
-					print STDERR "mr $action: $testname test received signal ".($? & 127)."\n";
+					warn "mr $action: $testname test received signal ".($? & 127)."\n";
 					return ABORT;
 				}
 			}
 			if ($ret >> 8 == 0) {
 				if ($testname eq "deleted") {
 					if (-d $dir) {
-						print STDERR "mr error: $dir should be deleted yet still exists\n";
+						warn "mr error: $dir should be deleted yet still exists\n";
 						return FAILED;
 					}
 				}
@@ -697,17 +697,17 @@ sub action {
 	}
 
 	if (! $no_chdir && ! chdir($dir)) {
-		print STDERR "mr $action: failed to chdir to $dir: $!\n";
+		warn "mr $action: failed to chdir to $dir: $!\n";
 		return FAILED;
 	}
 	elsif (! defined $command) {
 		my $rcs=rcs_test(@_);
 		if (! defined $rcs) {
-			print STDERR "mr $action: unknown repository type and no defined $action command for $fulldir\n";
+			warn "mr $action: unknown repository type and no defined $action command for $fulldir\n";
 			return FAILED;
 		}
 		else {
-			print STDERR "mr $action: no defined action for $rcs repository $fulldir, skipping\n";
+			warn "mr $action: no defined action for $rcs repository $fulldir, skipping\n";
 			return SKIPPED;
 		}
 	}
@@ -736,7 +736,7 @@ sub action {
 			$ret = $?;
 			if ($ret != 0) {
 				print "$actionmsg\n";
-				print STDERR $output;
+				warn $output;
 			}
 		}
 		else {
@@ -744,16 +744,16 @@ sub action {
 		}
 		if ($ret != 0) {
 			if (($? & 127) == 2) {
-				print STDERR "mr $action: interrupted\n";
+				warn "mr $action: interrupted\n";
 				return ABORT;
 			}
 			elsif ($? & 127) {
-				print STDERR "mr $action: received signal ".($? & 127)."\n";
+				warn "mr $action: received signal ".($? & 127)."\n";
 				return ABORT;
 			}
-			print STDERR "mr $action: failed ($ret)\n" if $verbosity >= 1;
+			warn "mr $action: failed ($ret)\n" if $verbosity >= 1;
 			if ($ret >> 8 != 0) {
-				print STDERR "mr $action: command failed\n";
+				warn "mr $action: command failed\n";
 				if (-e "$ENV{HOME}/.mrlog" && $action ne 'remember') {
 					# recreate original command line to
 					# remember, and avoid recursing
@@ -764,13 +764,13 @@ sub action {
 				}
 			}
 			elsif ($ret != 0) {
-				print STDERR "mr $action: command died ($ret)\n";
+				warn "mr $action: command died ($ret)\n";
 			}
 			return FAILED;
 		}
 		else {
 			if ($is_checkout && ! -d $dir) {
-				print STDERR "mr $action: $dir missing after checkout\n";;
+				warn "mr $action: $dir missing after checkout\n";;
 				return FAILED;
 			}
 
@@ -802,7 +802,7 @@ sub hook {
 		my $output = qx/$shell 2>&1/;
 		$ret = $?;
 		if ($ret != 0) {
-			print STDERR $output;
+			warn $output;
 		}
 	}
 	else {
@@ -810,11 +810,11 @@ sub hook {
 	}
 	if ($ret != 0) {
 		if (($? & 127) == 2) {
-			print STDERR "mr $hook: interrupted\n";
+			warn "mr $hook: interrupted\n";
 			return ABORT;
 		}
 		elsif ($? & 127) {
-			print STDERR "mr $hook: received signal ".($? & 127)."\n";
+			warn "mr $hook: received signal ".($? & 127)."\n";
 			return ABORT;
 		}
 		else {
@@ -906,7 +906,7 @@ sub record {
 	elsif ($ret == FAILED) {
 		if ($interactive) {
 			chdir($dir) unless $no_chdir;
-			print STDERR "mr: Starting interactive shell. Exit shell to continue.\n";
+			warn "mr: Starting interactive shell. Exit shell to continue.\n";
 			system((getpwuid($<))[8], "-i");
 		}
 		push @failed, $dir;
@@ -938,7 +938,7 @@ sub showstats {
 			print "mr $action: (skipped: ".join(" ", @skipped).")\n" unless $quiet;
 		}
 		if (@failed) {
-			print STDERR "mr $action: (failed: ".join(" ", @failed).")\n";
+			warn "mr $action: (failed: ".join(" ", @failed).")\n";
 		}
 	}
 }
@@ -1359,7 +1359,7 @@ sub loadconfig {
 				debug(4, "mr: including output of \"$value\"\n");
 				unshift @lines, `$value`;
 				if ($?) {
-					print STDERR "mr: include command exited nonzero ($?)\n";
+					warn "mr: include command exited nonzero ($?)\n";
 				}
 				next;
 			}
@@ -1403,11 +1403,11 @@ sub loadconfig {
 						my $ret=system($value);
 						if ($ret != 0) {
 							if (($? & 127) == 2) {
-								print STDERR "mr: chain test interrupted\n";
+								warn "mr: chain test interrupted\n";
 								exit 2;
 							}
 							elsif ($? & 127) {
-								print STDERR "mr: chain test received signal ".($? & 127)."\n";
+								warn "mr: chain test received signal ".($? & 127)."\n";
 							}
 						}
 						else {
@@ -1634,7 +1634,7 @@ sub register {
 	if (@ARGV) {
 		my $subdir=shift @ARGV;
 		if (! chdir($subdir)) {
-			print STDERR "mr register: failed to chdir to $subdir: $!\n";
+			warn "mr register: failed to chdir to $subdir: $!\n";
 		}
 	}
 
@@ -1684,7 +1684,7 @@ sub bootstrap {
 		if exists $config{$topdir}{"."}{"checkout"};
 
 	if (-e ".mrconfig") {
-		print STDERR "mr bootstrap: .mrconfig file already exists, not overwriting with $url\n";
+		warn "mr bootstrap: .mrconfig file already exists, not overwriting with $url\n";
 	}
 	else {
 		eval q{use File::Copy};
@@ -1768,7 +1768,7 @@ sub getopts {
 
 sub init {
 	$SIG{INT}=sub {
-		print STDERR "mr: interrupted\n";
+		warn "mr: interrupted\n";
 		exit 2;
 	};
 	
