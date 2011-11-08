@@ -227,11 +227,12 @@ This option only filters the repositories already available; it cannot
 augment that list.  If this option is not specified, the default is to
 run on all available repositories.
 
-=item -v
+=item -v [N]
 
-=item --verbose
+=item --verbose[=N]
 
-Be verbose.
+Control verbosity level.  Defaults to 2.  If the option is used
+with no value for C<N> then c<N> defaults to 4.
 
 =item -q
 
@@ -527,7 +528,7 @@ use constant {
 
 # configurables
 my $config_overridden=0;
-my $verbose=0;
+my $verbosity=2;
 my $quiet=0;
 my $stats=0;
 my $insecure=0;
@@ -551,6 +552,16 @@ my (@ok, @failed, @skipped);
 
 main();
 
+sub abbrev_home {
+	$_[0] =~ s!(^|\s|\e[\d[\d;]+m)$ENV{HOME}/!$1~/!g;
+}
+
+sub debug {
+	my ($level, $output) = @_;
+	abbrev_home($output);
+	print $output if $verbosity >= $level;
+}
+
 my %rcs;
 sub rcs_test {
 	my ($action, $dir, $topdir, $subdir) = @_;
@@ -573,7 +584,7 @@ sub rcs_test {
 	$test=$config{$topdir}{$subdir}{lib}."\n".$test
 		if exists $config{$topdir}{$subdir}{lib};
 	
-	print "mr $action: running rcs test >>$test<<\n" if $verbose;
+	debug(4, "mr $action: running rcs test >>$test<<\n");
 	my $rcs=`$test`;
 	chomp $rcs;
 	if ($rcs=~/\n/s) {
@@ -637,7 +648,7 @@ sub action {
 		if (defined $testcommand) {
 			my $test="set -e;".$lib.
 				"my_action(){ $testcommand\n }; my_action '$action'";
-			print "mr $action: running $testname test >>$test<<\n" if $verbose;
+			debug(4, "mr $action: running $testname test >>$test<<\n");
 			my $ret=system($test);
 			if ($ret != 0) {
 				if (($? & 127) == 2) {
@@ -656,7 +667,7 @@ sub action {
 						return FAILED;
 					}
 				}
-				print "mr $action: skip $dir skipped\n" if $verbose;
+				debug(4, "mr $action: skip $dir skipped\n");
 				return SKIPPED;
 			}
 		}
@@ -665,7 +676,7 @@ sub action {
 	if ($is_checkout) {
 		if (! $force_checkout) {
 			if (-d $dir) {
-				print "mr $action: $dir already exists, skipping checkout\n" if $verbose;
+				debug(4, "mr $action: $dir already exists, skipping checkout\n");
 				return SKIPPED;
 			}
 	
@@ -681,7 +692,7 @@ sub action {
 	my $command=findcommand($action, $dir, $topdir, $subdir, $is_checkout);
 
 	if ($is_checkout && ! -d $dir) {
-		print "mr $action: creating parent directory $dir\n" if $verbose;
+		debug(4, "mr $action: creating parent directory $dir\n");
 		system("mkdir", "-p", $dir);
 	}
 
@@ -718,7 +729,7 @@ sub action {
 		$command="set -e; ".$lib.
 			"my_action(){ $command\n }; my_action ".
 			join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
-		print "mr $action: running >>$command<<\n" if $verbose;
+		debug(4, "mr $action: running >>$command<<\n");
 		my $ret;
 		if ($quiet) {
 			my $output = qx/$command 2>&1/;
@@ -740,7 +751,7 @@ sub action {
 				print STDERR "mr $action: received signal ".($? & 127)."\n";
 				return ABORT;
 			}
-			print STDERR "mr $action: failed ($ret)\n" if $verbose;
+			print STDERR "mr $action: failed ($ret)\n" if $verbosity >= 1;
 			if ($ret >> 8 != 0) {
 				print STDERR "mr $action: command failed\n";
 				if (-e "$ENV{HOME}/.mrlog" && $action ne 'remember') {
@@ -785,7 +796,7 @@ sub hook {
 	               $config{$topdir}{$subdir}{lib}."\n" : "";
 	my $shell="set -e;".$lib.
 		"my_hook(){ $command\n }; my_hook";
-	print "mr $hook: running >>$shell<<\n" if $verbose;
+	debug(4, "mr $hook: running >>$shell<<\n");
 	my $ret;
 	if ($quiet) {
 		my $output = qx/$shell 2>&1/;
@@ -1027,16 +1038,16 @@ sub repo_filtered {
 	my $name = $config{$topdir}{$subdir}{effective_name};
 
 	if (! defined $name) {
-		print "Filtering out non-named repo for $subdir\n";
+		debug(4, "Filtering out non-named repo for $subdir\n");
 		return 1;
 	}
 
 	if (! $selected{$name}) {
-		print "Filtering out repo '$name' via -r / --repos\n";
+		debug(4, "Filtering out repo '$name' via -r / --repos\n");
 		return 1;
 	}
 
-	print "Allowing selected repo '$name' via -r / --repos\n";
+	debug(4, "Allowing selected repo '$name' via -r / --repos\n");
 	return 0;
 }
 
@@ -1281,7 +1292,6 @@ sub loadconfig {
 			return;
 		}
 
-		print "mr: loading config $f\n" if $verbose;
 		open($in, "<", $f) || die "mr: open $f: $!\n";
 	}
 	my @lines=<$in>;
@@ -1346,7 +1356,7 @@ sub loadconfig {
 			}
 
 			if ($parameter eq "include") {
-				print "mr: including output of \"$value\"\n" if $verbose;
+				debug(4, "mr: including output of \"$value\"\n");
 				unshift @lines, `$value`;
 				if ($?) {
 					print STDERR "mr: include command exited nonzero ($?)\n";
@@ -1638,7 +1648,7 @@ sub register {
 	$command="set -e; ".$config{$directory}{DEFAULT}{lib}."\n".
 		"my_action(){ $command\n }; my_action ".
 		join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
-	print "mr register: running >>$command<<\n" if $verbose;
+	debug(4, "mr register: running >>$command<<\n");
 	exec($command) || die "exec: $!";
 }
 
@@ -1735,7 +1745,7 @@ sub getopts {
 		"c|config=s" => sub { $ENV{MR_CONFIG}=$_[1]; $config_overridden=1 },
 		"r|repos=s" => \$repos,
 		"p|path" => sub { }, # now default, ignore
-		"v|verbose" => \$verbose,
+		"v|verbose:3" => \$verbosity,
 		"q|quiet" => \$quiet,
 		"s|stats" => \$stats,
 		"k|insecure" => \$insecure,
