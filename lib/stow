@@ -25,15 +25,15 @@ lib =
     #
     stow () {
         init_stow_package
-        command stow $stow_common_opts "$MR_NAME"
+        command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
     }
     restow () {
         init_stow_package
-        command stow -R -p $stow_common_opts "$MR_NAME"
+        command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
     }
     unstow () {
         init_stow_package
-        command stow -D -p $stow_common_opts "$MR_NAME"
+        command "${STOW_COMMAND:-stow}" -D -p $stow_common_opts "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
     }
     #
