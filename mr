@@ -116,13 +116,15 @@ These commands are also available:
 
 =item bootstrap url [directory]
 
-Causes mr to download the url, and use it as a .mrconfig file
-to checkout the repositories listed in it, into the specified directory.
+Causes mr to download the url to a temporary file, and use it as a
+F<.mrconfig>-format file to checkout the repositories listed in it,
+into the specified directory.  The temporary file is saved to
+F<.mrconfig> in the current directory unless that file already exists.
 
 The directory will be created if it does not exist. If no directory is
 specified, the current directory will be used.
 
-If the .mrconfig file includes a repository named ".", that
+If the F<.mrconfig> file includes a repository named ".", that
 is checked out into the top of the specified directory.
 
 =item list (or ls)
@@ -1755,6 +1757,7 @@ sub bootstrap {
 		eval q{use File::Copy};
 		die $@ if $@;
 		move($tmpconfig, ".mrconfig") || die "rename: $!";
+		debug(2, "mr bootstrap: saved $url as .mrconfig\n");
 	}
 
 	# Reload the config file (in case we got a different version)
