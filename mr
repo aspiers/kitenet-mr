@@ -550,6 +550,7 @@ my $trust_all=0;
 my $directory=getcwd();
 my $repos="";
 
+my $HOME_MR_CONFIG = "$ENV{HOME}/.mrconfig";
 $ENV{MR_CONFIG}=find_mrconfig();
 
 # globals :-(
@@ -1111,14 +1112,14 @@ sub is_trusted_config {
 	my $config=shift; # must be abs_pathed already
 
 	# We always trust ~/.mrconfig.
-	return 1 if $config eq abs_path("$ENV{HOME}/.mrconfig");
+	return 1 if $config eq abs_path($HOME_MR_CONFIG);
 
 	return 1 if $trust_all;
 
 	my $trustfile=$ENV{HOME}."/.mrtrust";
 
 	if (! %trusted) {
-		$trusted{"$ENV{HOME}/.mrconfig"}=1;
+		$trusted{$HOME_MR_CONFIG}=1;
 		if (open (TRUST, "<", $trustfile)) {
 			while (<TRUST>) {
 				chomp;
@@ -1792,7 +1793,7 @@ sub find_mrconfig {
 		}
 		$dir=~s/\/[^\/]*$//;
 	}
-	return "$ENV{HOME}/.mrconfig";
+	return $HOME_MR_CONFIG;
 }
 
 sub getopts {
@@ -1866,9 +1867,11 @@ sub main {
 
 	startingconfig();
 	debug(4, "loading ~/.mrconfig\n");
-	loadconfig("$ENV{HOME}/.mrconfig");
-	debug(5, "loading \$MR_CONFIG\n");
-	loadconfig($ENV{MR_CONFIG});
+	loadconfig($HOME_MR_CONFIG);
+	if ($ENV{MR_CONFIG} ne $HOME_MR_CONFIG) {
+		debug(4, "loading \$MR_CONFIG\n");
+		loadconfig($ENV{MR_CONFIG});
+	}
 	register_repo_names();
 	#use Data::Dumper; print Dumper(\%config);
 	
