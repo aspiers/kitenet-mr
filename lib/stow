@@ -34,6 +34,7 @@ lib =
     unstow () {
         init_stow_package
         command stow -D -p $stow_common_opts "$MR_NAME"
+        rm -f "$STOW_PKG_PATH"
     }
     #
     ensure_symlink_exists () {
