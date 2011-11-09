@@ -1778,14 +1778,8 @@ sub register {
 	exec($command) || die "exec: $!";
 }
 
-sub bootstrap {
-	my $url=shift @ARGV;
-	my $dir=shift @ARGV || ".";
-	
-	if (! defined $url || ! length $url) {
-		die "mr: bootstrap requires url\n";
-	}
-	
+sub download {
+	my $url=shift;
 	# Download the config file to a temporary location.
 	eval q{use File::Temp};
 	die $@ if $@;
@@ -1795,6 +1789,18 @@ sub bootstrap {
 	my $curlstatus = system(@curlargs);
 	die "mr bootstrap: invalid SSL certificate for $url (consider -k)\n" if $curlstatus >> 8 == 60;
 	die "mr bootstrap: download of $url failed\n" if $curlstatus != 0;
+	return $tmpconfig;
+}
+
+sub bootstrap {
+	my $url=shift @ARGV;
+	my $dir=shift @ARGV || ".";
+
+	if (! defined $url || ! length $url) {
+		die "mr: bootstrap requires url\n";
+	}
+
+	my $tmpconfig = download($url);
 
 	if (! -e $dir) {
 		system("mkdir", "-p", $dir);
