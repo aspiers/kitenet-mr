@@ -1100,12 +1100,34 @@ sub expandenv {
 	return $val;
 }
 
+sub safe_abs_path {
+	my $path=shift;
+	my $abs=abs_path($path);
+	unless (defined $abs and length($abs)) {
+		if (! -e $path) {
+			if (-l $path) {
+				warn "mr: $path is a dangling symlink.\n";
+			}
+			else {
+				# Valid reasons for this to happen,
+				# e.g. if ~/.mrtrust references a file
+				# in a non-existent directory.
+			}
+			return $path;
+		}
+		else {
+			die "mr: BUG: this shouldn't happen.\n";
+		}
+	}
+	return $abs;
+}
+
 my %trusted;
 sub is_trusted_config {
 	my $config=shift; # must be abs_pathed already
 
 	# We always trust ~/.mrconfig.
-	return 1 if $config eq abs_path($HOME_MR_CONFIG);
+	return 1 if $config eq safe_abs_path($HOME_MR_CONFIG);
 
 	return 1 if $trust_all;
 
@@ -1117,7 +1139,7 @@ sub is_trusted_config {
 			while (<TRUST>) {
 				chomp;
 				s/^~\//$ENV{HOME}\//;
-				$trusted{abs_path($_)}=1;
+				$trusted{safe_abs_path($_)}=1;
 			}
 			close TRUST;
 		}
@@ -1296,7 +1318,7 @@ sub loadconfig {
 		$trusted=1;
 	}
 	else {
-		my $absf=abs_path($f);
+		my $absf=safe_abs_path($f);
 		if ($loaded{$absf}) {
 			return;
 		}
@@ -1311,7 +1333,7 @@ sub loadconfig {
 			}
 		}
 
-		$dir=abs_path($dir)."/";
+		$dir=safe_abs_path($dir)."/";
 		
 		if (! exists $configfiles{$dir}) {
 			$configfiles{$dir}=$f;
@@ -1629,7 +1651,7 @@ sub config {
 	if ($section=~/^\//) {
 		# try to convert to a path relative to the config file
 		my ($dir)=$ENV{MR_CONFIG}=~/^(.*\/)[^\/]+$/;
-		$dir=abs_path($dir);
+		$dir=safe_abs_path($dir);
 		$dir.="/" unless $dir=~/\/$/;
 		if ($section=~/^\Q$dir\E(.*)/) {
 			$section=$1;
@@ -1663,7 +1685,7 @@ sub register {
 	if ($config_overridden) {
 		# Find the directory that the specified config file is
 		# located in.
-		($directory)=abs_path($ENV{MR_CONFIG})=~/^(.*\/)[^\/]+$/;
+		($directory)=safe_abs_path($ENV{MR_CONFIG})=~/^(.*\/)[^\/]+$/;
 	}
 	else {
 		# Find the closest known mrconfig file to the current
@@ -1734,7 +1756,7 @@ sub bootstrap {
 
 	# Special case to handle checkout of the "." repo, which 
 	# would normally be skipped.
-	my $topdir=abs_path(".")."/";
+	my $topdir=safe_abs_path(".")."/";
 	my @repo=($topdir, $topdir, ".");
 	debug(4, "special case loadconfig during bootstrap\n");
 	loadconfig($tmpconfig, $topdir, $url);
@@ -1757,7 +1779,7 @@ sub bootstrap {
 	startingconfig();
 	loadconfig(".mrconfig");
 	dispatch("checkout");
-	@skipped=grep { abs_path($_) ne abs_path($topdir) } @skipped;
+	@skipped=grep { safe_abs_path($_) ne safe_abs_path($topdir) } @skipped;
 	showstats("bootstrap");
 	exitstats();
 }
@@ -1801,7 +1823,7 @@ sub getopts {
 	my @saved=@ARGV;
 	Getopt::Long::Configure("bundling", "no_permute");
 	my $result=GetOptions(
-		"d|directory=s" => sub { $directory=abs_path($_[1]) },
+		"d|directory=s" => sub { $directory=safe_abs_path($_[1]) },
 		"c|config=s" => sub { $ENV{MR_CONFIG}=$_[1]; $config_overridden=1 },
 		"r|repos=s" => \$repos,
 		"p|path" => sub { }, # now default, ignore
@@ -1838,7 +1860,7 @@ sub init {
 	if (! defined $directory) {
 		die("mr: failed to determine working directory\n");
 	}
-	# Make sure MR_CONFIG is an absolute path, but don't use abs_path since
+	# Make sure MR_CONFIG is an absolute path, but don't use safe_abs_path since
 	# the config file might be a symlink to elsewhere, and the directory it's
 	# in is significant.
 	if ($ENV{MR_CONFIG} !~ /^\//) {
