@@ -13,30 +13,54 @@ lib =
     [ -d "$STOW_DIR"    ] || mkdir -p "$STOW_DIR"
     [ -d "$STOW_TARGET" ] || mkdir -p "$STOW_TARGET"
     #
+    #MR_STOWABLE=no
+    is_stowable () {
+        mr -r "$MR_NAME" stowable >/dev/null 2>&1
+        #[ "$MR_STOWABLE" = yes ]
+    }
+    stowable_then_continue () {
+        if is_stowable; then
+            return 0
+        else
+            if [ -n "$1" ]; then
+                info "$MR_NAME isn't stowable; skipping $MR_ACTION"
+            fi
+            return 1
+        fi
+    }
+    #
     set_stow_common_opts () {
         STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
         stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
     }
     #
     mr_stow () {
+        stowable_then_continue || return 0
         set_stow_common_opts
         ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
         command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
     }
-    mr_restow () {
+    mr_restow_if_already_stowed () {
+        stowable_then_continue || return 0
         if ! [ -L "$STOW_PKG_PATH" ]; then
             info "$MR_REPO wasn't stowed yet; won't restow."
             return
         fi
+        mr_restow_regardless
+    }
+    mr_restow_regardless () {
+        stowable_then_continue || return 0
         set_stow_common_opts
+        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
         command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
     }
     mr_unstow () {
+        stowable_then_continue || return 0
+        set_stow_common_opts
         if ! [ -L "$STOW_PKG_PATH" ]; then
-            info "$MR_REPO wasn't stowed yet; can't unstow."
+            info "$MR_REPO wasn't stowed yet in $STOW_PKG_PATH; can't unstow."
             return
         fi
-        set_stow_common_opts
         command "${STOW_COMMAND:-stow}" -D -p $stow_common_opts "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
     }
@@ -57,11 +81,24 @@ lib =
         ln -s "$required_target" "$symlink"
     }
 
-#post_checkout = mr_stow
-post_update   = mr_restow
+#stowable      = is_stowable
+stowable      = false
+showstowable  =
+    if is_stowable; then
+        echo "$MR_NAME is stowable"
+    else
+        echo "$MR_NAME is not stowable"
+    fi
+
+# Automatic actions
+post_checkout = mr_stow
+#post_update   = mr_restow_if_already_stowed
+post_update   = mr_restow_regardless
+
+# Manual actions
 stow          = mr_stow
 unstow        = mr_unstow
-restow        = mr_restow
+restow        = mr_restow_regardless
 
 # Local variables:
 # mode: sh
