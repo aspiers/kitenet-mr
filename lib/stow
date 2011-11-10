@@ -23,15 +23,15 @@ lib =
         ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
     }
     #
-    stow () {
+    mr_stow () {
         init_stow_package
         command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
     }
-    restow () {
+    mr_restow () {
         init_stow_package
         command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
     }
-    unstow () {
+    mr_unstow () {
         init_stow_package
         command "${STOW_COMMAND:-stow}" -D -p $stow_common_opts "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
@@ -53,11 +53,11 @@ lib =
         ln -s "$required_target" "$symlink"
     }
 
-post_checkout = stow
-post_update   = restow
-stow          = stow
-unstow        = unstow
-restow        = restow
+post_checkout = mr_stow
+post_update   = mr_restow
+stow          = mr_stow
+unstow        = mr_unstow
+restow        = mr_restow
 
 # Local variables:
 # mode: sh
