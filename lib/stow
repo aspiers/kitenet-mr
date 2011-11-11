@@ -1,0 +1,180 @@
+# stow plug-in for Joey Hess' excellent mr tool.
+#
+# This allows using GNU stow as a symlink manager with mr.
+#
+# Author: Adam Spiers <mr@adamspiers.org>
+
+# INSTRUCTIONS
+#
+# To make mr use this file, add a line like this inside the [DEFAULT]
+# section of your ~/.mrconfig:
+#
+#   include = cat /usr/share/mr/stow
+#
+# and then inside each [repo] section of your ~/.mrconfig for
+# which you want the contents to be stowed, add this line:
+#
+#   stowable = true
+#
+# Obviously you also need stow installed.  This plug-in assumes that
+# stow is on the PATH, but you can export STOW_COMMAND to override
+# this if it's somewhere else.
+#
+# It is *strongly* recommended that you put the below snippet in your
+# .mrconfig to get a version of GNU stow which has been specially
+# hacked to integrate nicely with mr.  The last official GNU release
+# was 1.3.3 in January 2002, but there has been an almost complete
+# rewrite since then (version 2.x), and Adam subsequently became
+# co-maintainer and made many further improvements which will be
+# released shortly.
+#
+# --------- 8< --- copy into your ~/.mrconfig ---- 8< ---------
+# [stow]
+# checkout = git_clone git://git.savannah.gnu.org/stow.git
+# fixups =
+#     cd "$MR_REPO"
+#     ./configure --disable-maintainer-mode --prefix=$HOME
+#     make install
+# --------- 8< --------- 8< --------- 8< --------- 8< ---------
+#
+# In particular, the 2002 version could create a frankenstein ~/.git/
+# directory containing symlinks to multiple .git/ sub-directories in
+# different stow packages!  The github version does not have this
+# problem - it supports local per-directory .stow-local-ignore and
+# global ~/.stow-global-ignore files, and even without configuration
+# of these, it chooses sensible default ignore lists which prevent
+# stowing of a package's .git/ sub-directory.  These ignore lists are
+# also ideal if you only want to stow a subset of a stow package's
+# contents.
+#
+# The default behaviour is to stow on checkout, and restow on update.
+# The manual actions 'stow', 'restow', and 'unstow' are also
+# available.
+#
+# By default, ~/.stow is used as the stow directory, and ~ as the
+# target directory.  You can export STOW_DIR and STOW_TARGET to
+# override these defaults.
+
+lib =
+    : ${STOW_DIR:=$HOME/.STOW}
+    : ${STOW_TARGET:=$HOME}
+    #
+    if ! [ -d "$STOW_TARGET"    ]; then mkdir -p "$STOW_TARGET"; fi
+    if ! [ -d "$STOW_DIR"       ]; then mkdir -p "$STOW_DIR"   ; fi
+    if ! [ -f "$STOW_DIR/.stow" ]; then touch "$STOW_DIR/.stow"; fi
+    #
+    #MR_STOWABLE=no
+    is_stowable () {
+        [ -z "$MR_DISABLE_STOW" ] &&
+        mr -r "$MR_NAME" stowable >/dev/null 2>&1
+        #[ "$MR_STOWABLE" = yes ]
+    }
+    stowable_then_continue () {
+        if is_stowable; then
+            return 0
+        else
+            if [ -n "$1" ]; then
+                info "$MR_NAME isn't stowable; skipping $MR_ACTION"
+            fi
+            return 1
+        fi
+    }
+    #
+    set_stow_common_opts () {
+        STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
+        stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
+        STOW="${STOW_COMMAND:-stow}"
+        case "`$STOW --version`" in
+            'version 1.*')
+                stow_common_opts="$stow_common_opts -p"
+                ;;
+            *)
+                ;;
+        esac
+        if [ -n "$MR_STOW_OPTIONS" ]; then
+            stow_common_opts="$stow_common_opts $MR_STOW_OPTIONS"
+        fi
+        if [ -n "$MR_STOW_OVER" ]; then
+            stow_common_opts="$stow_common_opts --override=$MR_STOW_OVER"
+        fi
+    }
+    #
+    mr_stow () {
+        stowable_then_continue || return 0
+        set_stow_common_opts
+        ensure_stow_symlink_exists
+        command "$STOW" $stow_common_opts "$@" "$MR_NAME"
+        info "Stowed $MR_NAME"
+    }
+    mr_restow_if_already_stowed () {
+        stowable_then_continue || return 0
+        if ! [ -L "$STOW_PKG_PATH" ]; then
+            info "$MR_REPO wasn't stowed yet; won't restow."
+            return
+        fi
+        mr_restow_regardless "$@"
+    }
+    mr_restow_regardless () {
+        stowable_then_continue || return 0
+        set_stow_common_opts
+        ensure_stow_symlink_exists
+        command "$STOW" -R $stow_common_opts "$@" "$MR_NAME"
+        info "Restowed $MR_NAME"
+    }
+    mr_unstow () {
+        stowable_then_continue || return 0
+        set_stow_common_opts
+        if ! [ -L "$STOW_PKG_PATH" ]; then
+            info "$MR_REPO wasn't stowed yet in $STOW_PKG_PATH; can't unstow."
+            return
+        fi
+        command "$STOW" -D $stow_common_opts "$@" "$MR_NAME"
+        rm -f "$STOW_PKG_PATH"
+        info "Unstowed $MR_NAME"
+    }
+    #
+    ensure_symlink_exists () {
+        [ $# = 2 ] || error "CONFIG BUG: Usage: ensure_symlink_exists SYMLINK TARGET"
+        symlink="$1"
+        required_target="$2"
+        if [ -L "$symlink" ]; then
+            actual_target="`readlink $symlink`"
+            if [ "$actual_target" = "$required_target" ]; then
+                return
+            else
+                error "Symlink $symlink already points to $actual_target, cannot point to $required_target; aborting."
+            fi
+        fi
+        [ -e "$symlink" ] && error "Cannot create symlink $symlink - already exists; aborting."
+        ln -s "$required_target" "$symlink"
+    }
+    #
+    ensure_stow_symlink_exists () {
+        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+    }
+
+#stowable      = is_stowable
+stowable      = false
+showstowable  =
+    if is_stowable; then
+        echo "$MR_NAME is stowable"
+    else
+        echo "$MR_NAME is not stowable"
+    fi
+
+# Automatic actions - note that these run before fixups,
+# which allows fixups to refer to stowed files.
+post_checkout_append = mr_stow
+#post_update_append   = mr_restow_if_already_stowed
+post_update_append   = mr_restow_regardless
+
+# Manual actions
+stow          = mr_stow "$@"
+stowover      = MR_STOW_OVER=. mr_stow "$@"
+unstow        = mr_unstow "$@"
+restow        = mr_restow_regardless "$@"
+restowover    = MR_STOW_OVER=. mr_restow_regardless "$@"
+
+# Local variables:
+# mode: sh
+# End:
