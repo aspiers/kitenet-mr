@@ -18,21 +18,25 @@ lib =
         stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
     }
     #
-    init_stow_package () {
+    mr_stow () {
         set_stow_common_opts
         ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
-    }
-    #
-    mr_stow () {
-        init_stow_package
         command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
     }
     mr_restow () {
-        init_stow_package
+        if ! [ -L "$STOW_PKG_PATH" ]; then
+            info "$MR_REPO wasn't stowed yet; won't restow."
+            return
+        fi
+        set_stow_common_opts
         command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
     }
     mr_unstow () {
-        init_stow_package
+        if ! [ -L "$STOW_PKG_PATH" ]; then
+            info "$MR_REPO wasn't stowed yet; can't unstow."
+            return
+        fi
+        set_stow_common_opts
         command "${STOW_COMMAND:-stow}" -D -p $stow_common_opts "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
     }
@@ -53,7 +57,7 @@ lib =
         ln -s "$required_target" "$symlink"
     }
 
-post_checkout = mr_stow
+#post_checkout = mr_stow
 post_update   = mr_restow
 stow          = mr_stow
 unstow        = mr_unstow
