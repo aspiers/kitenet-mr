@@ -1439,7 +1439,7 @@ sub loadconfig {
 			}
 
 			if (! defined $section) {
-				die "$f line $.: parameter ($parameter) not in section\n";
+				die "$f line $line: parameter ($parameter) not in section\n";
 			}
 			if ($section eq 'ALIAS') {
 				$alias{$parameter}=$value;
