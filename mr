@@ -1366,10 +1366,15 @@ sub loadconfig {
 
 	my $section;
 	my $line=0;
+	my $INCLUDE_STRING = "# INCLUDED FROM:";
 	while (@lines) {
 		$_=shift @lines;
 		$line++;
 		chomp;
+		if (/^$INCLUDE_STRING (.+)$/) {
+			debug(4, "Include from $1\n");
+			next;
+		}
 		next if /^\s*\#/ || /^\s*$/;
 		if (/^\[([^\]]*)\]\s*$/) {
 			$section=$1;
