@@ -586,7 +586,8 @@ sub rcs_test {
 	$test=$config{$topdir}{$subdir}{lib}."\n".$test
 		if exists $config{$topdir}{$subdir}{lib};
 	
-	debug(4, "mr $action: running rcs test >>$test<<\n");
+	debug(3, "mr $action: running rcs test\n");
+	debug(5, ">>$test<<\n");
 	my $rcs=`$test`;
 	chomp $rcs;
 	if ($rcs=~/\n/s) {
@@ -629,6 +630,31 @@ sub fulldir {
 	return $subdir =~ /^\// ? $subdir : $topdir.$subdir;
 }
 
+sub wrap_shell_code {
+	my ($code, $lib, $action, $type, $args) = @_;
+	$args = $args ? " $args" : '';
+	(my $fn = "my_$type") =~ s/ /_/g;
+	$code=<<EOF;
+$fn() {
+$code
+}
+$fn$args
+EOF
+	debug(4, <<EOF) unless $verbosity > 4;
+mr $action: running $type code: >>
+set -e
+[lib code - use -v5 to view in full]
+$code<<
+EOF
+	$code="set -e\n$lib\n$code";
+	debug(5, "mr $action: running $type code: >>\n$code<<\n");
+	return $code;
+}
+
+sub quote_args {
+	return join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @_);
+}
+
 sub action {
 	my ($action, $dir, $topdir, $subdir, $force_checkout) = @_;
 	my $fulldir=fulldir($topdir, $subdir);
@@ -648,9 +674,7 @@ sub action {
 		my $testcommand=findcommand($testname, $dir, $topdir, $subdir, $is_checkout);
 
 		if (defined $testcommand) {
-			my $test="set -e;".$lib.
-				"my_action(){ $testcommand\n }; my_action '$action'";
-			debug(4, "mr $action: running $testname test >>$test<<\n");
+			my $test=wrap_shell_code($testcommand, $lib, $action, "$testname test", "'$action'");
 			my $ret=system($test);
 			if ($ret != 0) {
 				if (($? & 127) == 2) {
@@ -669,7 +693,7 @@ sub action {
 						return FAILED;
 					}
 				}
-				debug(4, "mr $action: skip $dir skipped\n");
+				debug(3, "mr $action: skip $dir skipped\n");
 				return SKIPPED;
 			}
 		}
@@ -678,7 +702,7 @@ sub action {
 	if ($is_checkout) {
 		if (! $force_checkout) {
 			if (-d $dir) {
-				debug(4, "mr $action: $dir already exists, skipping checkout\n");
+				debug(3, "mr $action: $dir already exists, skipping checkout\n");
 				return SKIPPED;
 			}
 	
@@ -694,7 +718,7 @@ sub action {
 	my $command=findcommand($action, $dir, $topdir, $subdir, $is_checkout);
 
 	if ($is_checkout && ! -d $dir) {
-		debug(4, "mr $action: creating parent directory $dir\n");
+		debug(3, "mr $action: creating parent directory $dir\n");
 		system("mkdir", "-p", $dir);
 	}
 
@@ -728,10 +752,8 @@ sub action {
 		my $hookret=hook("pre_$action", $topdir, $subdir);
 		return $hookret if $hookret != OK;
 
-		$command="set -e; ".$lib.
-			"my_action(){ $command\n }; my_action ".
-			join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
-		debug(4, "mr $action: running >>$command<<\n");
+		my $args = quote_args(@ARGV);
+                $command = wrap_shell_code($command, $lib, $action, 'action', $args);
 		my $ret;
 		if ($verbosity == 0) {
 			my $output = qx/$command 2>&1/;
@@ -796,9 +818,7 @@ sub hook {
 	return OK unless defined $command;
 	my $lib=exists $config{$topdir}{$subdir}{lib} ?
 	               $config{$topdir}{$subdir}{lib}."\n" : "";
-	my $shell="set -e;".$lib.
-		"my_hook(){ $command\n }; my_hook";
-	debug(4, "mr $hook: running >>$shell<<\n");
+	my $shell = wrap_shell_code($command, $lib, $hook, 'hook');
 	my $ret;
 	if ($verbosity == 0) {
 		my $output = qx/$shell 2>&1/;
@@ -995,20 +1015,31 @@ sub selectrepos {
 		next if repo_filtered($topdir, $subdir);
 
 		my $dir=repodir($repo);
-		my $d=$directory;
+		my $wd=$directory;
 		$dir.="/" unless $dir=~/\/$/;
-		$d.="/" unless $d=~/\/$/;
-		next if $dir ne $d && $dir !~ /^\Q$d\E/;
+		$wd.="/" unless $wd=~/\/$/;
+		if ($dir ne $wd && $dir !~ /^\Q$wd\E/) {
+			debug(3, "Skipping repo in $dir - working directory $wd didn't contain it\n");
+			next;
+		}
 		if (defined $max_depth) {
 			my @a=split('/', $dir);
-			my @b=split('/', $d);
+			my @b=split('/', $wd);
 			do { } while (@a && @b && shift(@a) eq shift(@b));
-			next if @a > $max_depth || @b > $max_depth;
+			if (@a > $max_depth) {
+				debug(3, "Skipping repo in $dir - > $max_depth level(s) deeper than $wd\n");
+				next;
+			}
+			if (@b > $max_depth) {
+				# FIXME: error out, this should never happen
+				debug(3, "Skipping repo in $dir - $wd > $max_depth level(s) deeper\n");
+				next;
+			}
 		}
 		push @repos, [$dir, $topdir, $subdir];
 	}
 	if (! @repos) {
-		# fallback to find a leaf repo
+		debug(3, "No repos found; falling back to find a leaf repo\n");
 		foreach my $repo (reverse repolist()) {
 			my $topdir=$repo->{topdir};
 			my $subdir=$repo->{subdir};
@@ -1016,10 +1047,11 @@ sub selectrepos {
 			next if repo_filtered($topdir, $subdir);
 
 			my $dir=repodir($repo);
-			my $d=$directory;
+			my $wd=$directory;
 			$dir.="/" unless $dir=~/\/$/;
-			$d.="/" unless $d=~/\/$/;
-			if ($d=~/^\Q$dir\E/) {
+			$wd.="/" unless $wd=~/\/$/;
+			if ($wd=~/^\Q$dir\E/) {
+				debug(4, "Including repo in $dir - contained working directory $wd\n");
 				push @repos, [$dir, $topdir, $subdir];
 				last;
 			}
@@ -1246,6 +1278,11 @@ sub loadconfig {
 	my $dir=shift;
 	my $bootstrap_url=shift;
 
+	my $debug = "loadconfig: " . (ref($f) eq 'GLOB' ? "built-ins" : $f);
+	$debug .= " dir: $dir" if $dir;
+	$debug .= " bootstrap_url: $bootstrap_url" if $bootstrap_url;
+	debug(3, "$debug\n");
+
 	my @toload;
 
 	my $in;
@@ -1308,6 +1345,7 @@ sub loadconfig {
 		next if /^\s*\#/ || /^\s*$/;
 		if (/^\[([^\]]*)\]\s*$/) {
 			$section=$1;
+			debug(5, "got section header: $_\n");
 
 			if (! $trusted) {
 				if (! is_trusted_repo($section) ||
@@ -1335,6 +1373,7 @@ sub loadconfig {
 				$value.="\n$1";
 				chomp $value;
 			}
+			debug(5, "got parameter $parameter for $section: [$value]\n");
 
 			if (! $trusted) {
 				# Untrusted files can only contain a few
@@ -1425,6 +1464,7 @@ sub loadconfig {
 	}
 
 	foreach my $c (@toload) {
+		debug(4, "chaining to " . join(" / ", @$c) . "\n");
 		loadconfig(@$c);
 	}
 }
@@ -1647,10 +1687,9 @@ sub register {
 	}
 
 	$ENV{MR_REPO}=~s/.*\/(.*)/$1/;
-	$command="set -e; ".$config{$directory}{DEFAULT}{lib}."\n".
-		"my_action(){ $command\n }; my_action ".
-		join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
-	debug(4, "mr register: running >>$command<<\n");
+	my $args = quote_args(@ARGV);
+	my $shell = wrap_shell_code($command, $config{$directory}{DEFAULT}{lib},
+				    'register', 'action', $args);
 	exec($command) || die "exec: $!";
 }
 
@@ -1681,6 +1720,7 @@ sub bootstrap {
 	# would normally be skipped.
 	my $topdir=abs_path(".")."/";
 	my @repo=($topdir, $topdir, ".");
+	debug(4, "special case loadconfig during bootstrap\n");
 	loadconfig($tmpconfig, $topdir, $url);
 	record(\@repo, action("checkout", @repo, 1))
 		if exists $config{$topdir}{"."}{"checkout"};
@@ -1696,6 +1736,7 @@ sub bootstrap {
 
 	# Reload the config file (in case we got a different version)
 	# and checkout everything else.
+	debug(4, "reloading config after bootstrap download\n");
 	startingconfig();
 	loadconfig(".mrconfig");
 	dispatch("checkout");
@@ -1803,11 +1844,15 @@ sub exitstats {
 }
 
 sub main {
+	my @orig_ARGV = @ARGV;
 	getopts();
+	debug(4, "mrconfig invoked with args: @orig_ARGV\n");
 	init();
 
 	startingconfig();
+	debug(4, "loading ~/.mrconfig\n");
 	loadconfig("$ENV{HOME}/.mrconfig");
+	debug(5, "loading \$MR_CONFIG\n");
 	loadconfig($ENV{MR_CONFIG});
 	register_repo_names();
 	#use Data::Dumper; print Dumper(\%config);
