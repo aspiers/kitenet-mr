@@ -1614,7 +1614,7 @@ sub loadconfig {
 			}
 
 			if ($parameter eq "include") {
-				debug(4, "mr: including output of \"$value\"\n");
+				debug(4, "mr: including output of >>$value<< from $f line $line\n");
 				my @inc=`$value`;
 				if ($?) {
 					warn "mr: include command exited nonzero ($?)\n";
