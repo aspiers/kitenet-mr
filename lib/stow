@@ -1,0 +1,63 @@
+# This allows using GNU stow as a symlink manager with mr.
+#
+# FIXME
+
+# To make mr use this file, add a line like this inside the [DEFAULT]
+# section of your ~/.mrconfig
+#include = cat /usr/share/mr/stow
+
+lib =
+    : ${STOW_DIR:=$HOME/.STOW}
+    : ${STOW_TARGET:=$HOME}
+    #
+    [ -d "$STOW_DIR"    ] || mkdir -p "$STOW_DIR"
+    [ -d "$STOW_TARGET" ] || mkdir -p "$STOW_TARGET"
+    #
+    set_stow_common_opts () {
+        STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
+        stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
+    }
+    #
+    init_stow_package () {
+        set_stow_common_opts
+        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+    }
+    #
+    stow () {
+        init_stow_package
+        command stow $stow_common_opts "$MR_NAME"
+    }
+    restow () {
+        init_stow_package
+        command stow -R -p $stow_common_opts "$MR_NAME"
+    }
+    unstow () {
+        init_stow_package
+        command stow -D -p $stow_common_opts "$MR_NAME"
+    }
+    #
+    ensure_symlink_exists () {
+        [ $# = 2 ] || error "CONFIG BUG: Usage: ensure_symlink_exists SYMLINK TARGET"
+        symlink="$1"
+        required_target="$2"
+        if [ -L "$symlink" ]; then
+            actual_target="`readlink $symlink`"
+            if [ "$actual_target" = "$required_target" ]; then
+                return
+            else
+                error "Symlink $symlink already points to $actual_target, cannot point to $required_target; aborting."
+            fi
+        fi
+        [ -e "$symlink" ] && error "Cannot create symlink $symlink - already exists; aborting."
+        ln -s "$required_target" "$symlink"
+    }
+
+post_checkout = stow
+post_update   = restow
+stow          = stow
+unstow        = unstow
+restow        = restow
+
+# Local variables:
+# mode: sh
+# End:
