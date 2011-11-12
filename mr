@@ -629,7 +629,7 @@ my $max_depth;
 my $no_chdir=0;
 my $jobs=1;
 my $trust_all=0;
-my $directory=getcwd();
+my $working_directory=getcwd();
 my $repos="";
 
 my $HOME_MR_CONFIG = "$ENV{HOME}/.mrconfig";
@@ -906,7 +906,7 @@ sub action {
 			$actionmsg="mr $action: $fulldir";
 		}
 		else {
-			my $s=$directory;
+			my $s=$working_directory;
 			$s=~s/^\Q$fulldir\E\/?//;
 			$actionmsg="mr $action: $fulldir (in subdir $s)";
 		}
@@ -1210,7 +1210,7 @@ sub selectrepos {
 		next if repo_filtered($topdir, $subdir);
 
 		my $dir=repodir($repo);
-		my $wd=$directory;
+		my $wd=$working_directory;
 		$dir.="/" unless $dir=~/\/$/;
 		$wd.="/" unless $wd=~/\/$/;
 		if ($dir ne $wd && $dir !~ /^\Q$wd\E/) {
@@ -1242,7 +1242,7 @@ sub selectrepos {
 			next if repo_filtered($topdir, $subdir);
 
 			my $dir=repodir($repo);
-			my $wd=$directory;
+			my $wd=$working_directory;
 			$dir.="/" unless $dir=~/\/$/;
 			$wd.="/" unless $wd=~/\/$/;
 			if ($wd=~/^\Q$dir\E/) {
@@ -1909,24 +1909,24 @@ sub register {
 	if ($config_overridden) {
 		# Find the directory that the specified config file is
 		# located in.
-		($directory)=safe_abs_path($ENV{MR_CONFIG})=~/^(.*\/)[^\/]+$/;
+		($working_directory)=safe_abs_path($ENV{MR_CONFIG})=~/^(.*\/)[^\/]+$/;
 	}
 	else {
 		# Find the closest known mrconfig file to the current
 		# directory.
-		$directory.="/" unless $directory=~/\/$/;
+		$working_directory.="/" unless $working_directory=~/\/$/;
 		my $foundconfig=0;
 		foreach my $topdir (reverse sort keys %config) {
 			next unless length $topdir;
-			if ($directory=~/^\Q$topdir\E/) {
+			if ($working_directory=~/^\Q$topdir\E/) {
 				$ENV{MR_CONFIG}=$configfiles{$topdir};
-				$directory=$topdir;
+				$working_directory=$topdir;
 				$foundconfig=1;
 				last;
 			}
 		}
 		if (! $foundconfig) {
-			$directory=""; # no config file, use builtin
+			$working_directory=""; # no config file, use builtin
 		}
 	}
 	if (@ARGV) {
@@ -1937,13 +1937,13 @@ sub register {
 	}
 
 	$ENV{MR_REPO}=getcwd();
-	my $command=findcommand("register", $ENV{MR_REPO}, $directory, 'DEFAULT', 0);
+	my $command=findcommand("register", $ENV{MR_REPO}, $working_directory, 'DEFAULT', 0);
 	if (! defined $command) {
 		die "mr register: unknown repository type\n";
 	}
 
 	$ENV{MR_REPO}=~s/.*\/(.*)/$1/;
-	$command="set -e; ".$config{$directory}{DEFAULT}{lib}."\n".
+	$command="set -e; ".$config{$working_directory}{DEFAULT}{lib}."\n".
 		"my_action(){ $command\n }; my_action ".
 		join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
 	debug(4, "mr register: running >>$command<<\n");
@@ -2048,7 +2048,7 @@ sub getopts {
 	my @saved=@ARGV;
 	Getopt::Long::Configure("bundling", "no_permute");
 	my $result=GetOptions(
-		"d|directory=s" => sub { $directory=safe_abs_path($_[1]) },
+		"d|directory=s" => sub { $working_directory=safe_abs_path($_[1]) },
 		"c|config=s" => sub { $ENV{MR_CONFIG}=$_[1]; $config_overridden=1 },
 		"r|repos=s" => \$repos,
 		"p|path" => sub { }, # now default, ignore
@@ -2086,7 +2086,7 @@ sub init {
 	
 	# This can happen if it's run in a directory that was removed
 	# or other strangeness.
-	if (! defined $directory) {
+	if (! defined $working_directory) {
 		die("mr: failed to determine working directory\n");
 	}
 	# Make sure MR_CONFIG is an absolute path, but don't use safe_abs_path since
