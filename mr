@@ -757,7 +757,8 @@ sub action {
 		else {
 			my $s=$working_directory;
 			$s=~s/^\Q$fulldir\E\/?//;
-			$actionmsg="mr $action: $fulldir (in subdir $s)";
+			$actionmsg="mr $action: $fulldir";
+			$actionmsg.=" (in subdir $s)" if length $s;
 		}
 		debug(1, "$actionmsg\n");
 
