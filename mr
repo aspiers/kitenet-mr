@@ -212,6 +212,21 @@ Use the specified mrconfig file. The default is to use both B<~/.mrconfig>
 as well as look for a .mrconfig file in the current directory, or in one
 of its parent directories.
 
+=item -r repo1,repo2,...
+
+=item --repos repo1,repo2,...
+
+Out of the repositories available (subject to options such as C<-d>
+and C<-c>), only act on the repositories listed.  This should be a
+comma-separated list of names as specified by the C<name> special
+parameter (or default values thereof).  They are still acted on in the
+order specified via the "order" parameter, rather than the order in
+the comma-separated list.
+
+This option only filters the repositories already available; it cannot
+augment that list.  If this option is not specified, the default is to
+run on all available repositories.
+
 =item -v
 
 =item --verbose
@@ -345,6 +360,21 @@ The "MR_ACTION" environment variable is set to the command being run
 A few parameters have special meanings:
 
 =over 4
+
+=item name
+
+The "name" parameter can be used to specify a unique name for this
+repository.  If not specified, defaults to the "basename" (i.e. final
+segment) of the repository path listed in the section header, but only
+if that default value has not already been given to another repo.
+
+This value can be referred to via the C<--repos> option in order to
+limit which repositories are acted on.  It is also passed to shell
+code via the C<MR_NAME> environment variable.
+
+If there is a clash of names, mr will warn you about it, but you will
+have to resolve it yourself; therefore F<.mrconfig> writers should
+note that there is no guarantee that C<MR_NAME> will get set.
 
 =item skip
 
@@ -515,12 +545,14 @@ my $no_chdir=0;
 my $jobs=1;
 my $trust_all=0;
 my $directory=getcwd();
+my $repos="";
 
 $ENV{MR_CONFIG}=find_mrconfig();
 
 # globals :-(
 my %config;
 my %configfiles;
+my %repos; # maps repo short names to [ $dir, $section ] arrayrefs.
 my %knownactions;
 my %alias;
 my (@ok, @failed, @skipped);
@@ -597,12 +629,14 @@ sub action {
 	my $fulldir=fulldir($topdir, $subdir);
 
 	$ENV{MR_CONFIG}=$configfiles{$topdir};
-	my $lib=exists $config{$topdir}{$subdir}{lib} ?
-	               $config{$topdir}{$subdir}{lib}."\n" : "";
+	my $repo_config = $config{$topdir}{$subdir};
+	my $lib=exists $repo_config->{lib} ? $repo_config->{lib}."\n" : "";
 	my $is_checkout=($action eq 'checkout');
 	my $is_update=($action =~ /update/);
 
 	($ENV{MR_REPO}=$dir) =~ s!/$!!;
+	$ENV{MR_NAME} = $repo_config->{effective_name}
+		if exists $repo_config->{effective_name};
 	$ENV{MR_ACTION}=$action;
 	
 	foreach my $testname ("skip", "deleted") {
@@ -953,7 +987,8 @@ sub selectrepos {
 		my $topdir=$repo->{topdir};
 		my $subdir=$repo->{subdir};
 
-		next if $subdir eq 'DEFAULT';
+		next if repo_filtered($topdir, $subdir);
+
 		my $dir=repodir($repo);
 		my $d=$directory;
 		$dir.="/" unless $dir=~/\/$/;
@@ -973,7 +1008,8 @@ sub selectrepos {
 			my $topdir=$repo->{topdir};
 			my $subdir=$repo->{subdir};
 			
-			next if $subdir eq 'DEFAULT';
+			next if repo_filtered($topdir, $subdir);
+
 			my $dir=repodir($repo);
 			my $d=$directory;
 			$dir.="/" unless $dir=~/\/$/;
@@ -986,6 +1022,30 @@ sub selectrepos {
 		$no_chdir=1;
 	}
 	return @repos;
+}
+
+sub repo_filtered {
+	my ($topdir, $subdir) = @_;
+
+	return 1 if $subdir eq 'DEFAULT';
+
+	my %selected = $repos ? map { $_ => 1 } split(/,/, $repos) : ();
+	return 0 unless %selected;
+
+	my $name = $config{$topdir}{$subdir}{effective_name};
+
+	if (! defined $name) {
+		print "Filtering out non-named repo for $subdir\n";
+		return 1;
+	}
+
+	if (! $selected{$name}) {
+		print "Filtering out repo '$name' via -r / --repos\n";
+		return 1;
+	}
+
+	print "Allowing selected repo '$name' via -r / --repos\n";
+	return 0;
 }
 
 sub expandenv {
@@ -1118,6 +1178,63 @@ sub trusterror {
 	}
 }
 
+sub register_repo_names {
+	foreach my $dir (keys %config) {
+		foreach my $section (keys %{ $config{$dir} }) {
+			next if $section eq 'DEFAULT';
+
+			my $name;
+			if (exists $config{$dir}{$section}{name}) {
+				$name = $config{$dir}{$section}{name};
+				if (exists $repos{$name}) {
+					my ($prev_dir, $prev_section) = @{ $repos{$name} };
+					my $this_config = $configfiles{$dir};
+					my $prev_config = $configfiles{$prev_dir};
+					s/^$ENV{HOME}/~/ for $prev_config, $prev_section, $this_config, $section;
+					die <<EOF;
+mr error: attempted to set '$name' for:
+
+  $section via $this_config
+
+but was already defined for:
+
+  $prev_section via $prev_config
+EOF
+				}
+			}
+			else {
+				(my $default_name = $section) =~ s!.*/!!;
+				if (exists $repos{$default_name}) {
+					my ($prev_dir, $prev_section) = @{ $repos{$default_name} };
+					my $this_config = $configfiles{$dir};
+					my $prev_config = $configfiles{$prev_dir};
+					s/^$ENV{HOME}/~/ for $prev_config, $prev_section, $this_config, $section;
+					warn <<EOF;
+mr error: could not allocate unique name '$default_name' for
+
+  $section via $this_config
+
+since already allocated to
+
+  $prev_section via $prev_config
+
+Add a 'name = ...' line if you want to be able to
+reference this repository by name.
+
+EOF
+				}
+				else {
+					$name = $default_name;
+				}
+			}
+			if (defined $name) {
+				$repos{$name} = [ $dir, $section ];
+				$config{$dir}{$section}{effective_name} = $name;
+			}
+		}
+	}
+}
+
 my %loaded;
 sub loadconfig {
 	my $f=shift;
@@ -1223,8 +1340,8 @@ sub loadconfig {
 						trusterror("mr: illegal checkout command \"$value\"", $f, $line, $bootstrap_url);
 					}
 				}
-				elsif ($parameter eq 'order') {
-					# not interpreted as a command, so
+				elsif ($parameter eq 'order' or $parameter eq 'name') {
+					# not interpreted as commands, so
 					# safe.
 				}
 				elsif ($value eq 'true' || $value eq 'false') {
@@ -1253,6 +1370,18 @@ sub loadconfig {
 			}
 			elsif ($parameter eq 'lib') {
 				$config{$dir}{$section}{lib}.=$value."\n";
+			}
+			elsif ($parameter eq 'name') {
+				my $where = $f . " line $line";
+				if ($section eq 'DEFAULT') {
+					die "$where: name not allowed in DEFAULT section\n";
+				}
+				if (exists $config{$dir}{$section}{name}) {
+					die "$where: $section attempted to define name twice\n";
+				}
+				else {
+					$config{$dir}{$section}{name}=$value;
+				}
 			}
 			else {
 				$config{$dir}{$section}{$parameter}=$value;
@@ -1612,6 +1741,7 @@ sub getopts {
 	my $result=GetOptions(
 		"d|directory=s" => sub { $directory=abs_path($_[1]) },
 		"c|config=s" => sub { $ENV{MR_CONFIG}=$_[1]; $config_overridden=1 },
+		"r|repos=s" => \$repos,
 		"p|path" => sub { }, # now default, ignore
 		"v|verbose" => \$verbose,
 		"q|quiet" => \$quiet,
@@ -1674,6 +1804,7 @@ sub main {
 	startingconfig();
 	loadconfig("$ENV{HOME}/.mrconfig");
 	loadconfig($ENV{MR_CONFIG});
+	register_repo_names();
 	#use Data::Dumper; print Dumper(\%config);
 	
 	my $action=expandaction(shift @ARGV);
