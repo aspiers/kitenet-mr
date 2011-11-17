@@ -92,7 +92,7 @@ lib =
     mr_stow () {
         stowable_then_continue || return 0
         set_stow_common_opts
-        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+        ensure_stow_symlink_exists
         command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
     }
     mr_restow_if_already_stowed () {
@@ -106,7 +106,7 @@ lib =
     mr_restow_regardless () {
         stowable_then_continue || return 0
         set_stow_common_opts
-        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+        ensure_stow_symlink_exists
         command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
     }
     mr_unstow () {
@@ -134,6 +134,10 @@ lib =
         fi
         [ -e "$symlink" ] && error "Cannot create symlink $symlink - already exists; aborting."
         ln -s "$required_target" "$symlink"
+    }
+    #
+    ensure_stow_symlink_exists () {
+        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
     }
 
 #stowable      = is_stowable
