@@ -81,13 +81,14 @@ lib =
     set_stow_common_opts () {
         STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
         stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
+        STOW="${STOW_COMMAND:-stow}"
     }
     #
     mr_stow () {
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_stow_symlink_exists
-        command "${STOW_COMMAND:-stow}" $stow_common_opts "$MR_NAME"
+        command "$STOW" $stow_common_opts "$MR_NAME"
     }
     mr_restow_if_already_stowed () {
         stowable_then_continue || return 0
@@ -101,7 +102,7 @@ lib =
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_stow_symlink_exists
-        command "${STOW_COMMAND:-stow}" -R -p $stow_common_opts "$MR_NAME"
+        command "$STOW" -R $stow_common_opts "$MR_NAME"
     }
     mr_unstow () {
         stowable_then_continue || return 0
@@ -110,7 +111,7 @@ lib =
             info "$MR_REPO wasn't stowed yet in $STOW_PKG_PATH; can't unstow."
             return
         fi
-        command "${STOW_COMMAND:-stow}" -D -p $stow_common_opts "$MR_NAME"
+        command "$STOW" -D $stow_common_opts "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
     }
     #
