@@ -88,6 +88,13 @@ lib =
         STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
         stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
         STOW="${STOW_COMMAND:-stow}"
+        case "`$STOW --version`" in
+            'version 1.*')
+                stow_common_opts="$stow_common_opts -p"
+                ;;
+            *)
+                ;;
+        esac
     }
     #
     mr_stow () {
