@@ -229,6 +229,11 @@ This option only filters the repositories already available; it cannot
 augment that list.  If this option is not specified, the default is to
 run on all available repositories.
 
+The value (or the empty string if not specified) is passed to the
+<MR_REPOS> environment variable of sub-processes, so that shell code
+such as the C<lazy> function can determine whether C<mr> is acting on
+all repositories, or a manually selected subset.
+
 =item -v [N]
 
 =item --verbose[=N]
@@ -355,6 +360,10 @@ repository. (For the "register" action, "MR_REPO" is instead set to the
 basename of the directory that should be created when checking the
 repository out.)
 
+The C<MR_REPOS> environment variable is set to the value of the
+C<--repos> option, or the empty string if C<--repos> was not
+specified.
+
 The C<MR_CONFIG> environment variable is set to the .mrconfig file
 that defines the repo being acted on, or, if the repo is not yet in a config
 file, the F<.mrconfig> file that should be modified to register the repo.
@@ -402,7 +411,7 @@ been at least 12 hours since the last update.
  
 Another way to use skip is for a lazy checkout. This makes mr skip
 operating on a repo unless it already exists. To enable the 
-repo, you have to explicitly check it out (using "mr -d foo checkout").
+repo, you have to explicitly check it out (e.g. C<mr -r foo checkout>).
 
   [foo]
   checkout = ...
@@ -1854,6 +1863,8 @@ sub getopts {
 		"j|jobs:i" => \$jobs,
 		"t|trust-all" => \$trust_all,
 	);
+	$ENV{MR_REPOS} = $repos;
+
 	$verbosity = 0 if $quiet;
 	if (! $result || @ARGV < 1) {
 		die("Usage: mr [options] action [params ...]\n".
@@ -1969,11 +1980,15 @@ lib =
 		LANG=C bzr info | egrep -q '^Checkout'
 	}
 	lazy() {
-		if [ "$MR_ACTION" = checkout ] || [ -d "$MR_REPO" ]; then
-			return 1
-		else
-			return 0
+		if [ -d "$MR_REPO" ]; then
+			return 1 # don't skip
 		fi
+		if [ "$MR_ACTION" = checkout ] && [ -n "$MR_REPOS" ]; then
+			# This repo has been manually selected for
+			# checkout via --repos
+			return 1 # don't skip
+		fi
+		return 0 # skip
 	}
 
 svn_test = test -d "$MR_REPO"/.svn
