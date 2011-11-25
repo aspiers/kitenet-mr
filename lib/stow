@@ -70,6 +70,7 @@ lib =
     #
     #MR_STOWABLE=no
     is_stowable () {
+        [ -z "$MR_DISABLE_STOW" ] &&
         mr -r "$MR_NAME" stowable >/dev/null 2>&1
         #[ "$MR_STOWABLE" = yes ]
     }
