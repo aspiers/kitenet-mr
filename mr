@@ -584,6 +584,16 @@ sub debug {
 	print $output if $verbosity >= $level;
 }
 
+sub awarn {
+	my ($action, $message) = @_;
+	warn "mr $action: $message\n";
+}
+
+sub error {
+	my ($message) = @_;
+	warn "mr error: $message\n";
+}
+
 my %vcs;
 sub vcs_test {
 	my ($action, $dir, $topdir, $subdir) = @_;
@@ -613,7 +623,8 @@ sub vcs_test {
 	debug(5, "vcs test yielded >>$vcs<<\n");
 	if ($vcs=~/\n/s) {
 		$vcs=~s/\n/, /g;
-		warn "mr $action: found multiple possible repository types ($vcs) for ".fulldir($topdir, $subdir)."\n";
+		awarn($action, "found multiple possible repository types ($vcs) for "
+		      	       . fulldir($topdir, $subdir));
 		return undef;
 	}
 	if (! length $vcs) {
@@ -699,18 +710,18 @@ sub action {
 			my $ret=system($test);
 			if ($ret != 0) {
 				if (($? & 127) == 2) {
-					warn "mr $action: interrupted\n";
+					awarn($action, "interrupted");
 					return ABORT;
 				}
 				elsif ($? & 127) {
-					warn "mr $action: $testname test received signal ".($? & 127)."\n";
+					awarn($action, "$testname test received signal " . ($? & 127));
 					return ABORT;
 				}
 			}
 			if ($ret >> 8 == 0) {
 				if ($testname eq "deleted") {
 					if (-d $dir) {
-						warn "mr error: $dir should be deleted yet still exists\n";
+						error("$dir should be deleted yet still exists");
 						return FAILED;
 					}
 				}
@@ -744,17 +755,17 @@ sub action {
 	}
 
 	if (! $no_chdir && ! chdir($dir)) {
-		warn "mr $action: failed to chdir to $dir: $!\n";
+		awarn($action, "failed to chdir to $dir: $!");
 		return FAILED;
 	}
 	elsif (! defined $command) {
 		my $vcs=vcs_test(@_);
 		if (! defined $vcs) {
-			warn "mr $action: unknown repository type and no defined $action command for $fulldir\n";
+			awarn($action, "unknown repository type and no defined $action command for $fulldir");
 			return FAILED;
 		}
 		else {
-			warn "mr $action: no defined action for $vcs repository $fulldir, skipping\n";
+			awarn($action, "no defined action for $vcs repository $fulldir, skipping");
 			return SKIPPED;
 		}
 	}
@@ -790,16 +801,16 @@ sub action {
 		}
 		if ($ret != 0) {
 			if (($? & 127) == 2) {
-				warn "mr $action: interrupted\n";
+				awarn($action, "interrupted");
 				return ABORT;
 			}
 			elsif ($? & 127) {
-				warn "mr $action: received signal ".($? & 127)."\n";
+				awarn($action, "received signal " . ($? & 127));
 				return ABORT;
 			}
-			warn "mr $action: failed ($ret)\n" if $verbosity >= 1;
+			awarn($action, "failed ($ret)") if $verbosity >= 1;
 			if ($ret >> 8 != 0) {
-				warn "mr $action: command failed\n";
+				awarn($action, "command failed");
 				if (-e "$ENV{HOME}/.mrlog" && $action ne 'remember') {
 					# recreate original command line to
 					# remember, and avoid recursing
@@ -810,13 +821,13 @@ sub action {
 				}
 			}
 			elsif ($ret != 0) {
-				warn "mr $action: command died ($ret)\n";
+				awarn($action, "command died ($ret)");
 			}
 			return FAILED;
 		}
 		else {
 			if ($is_checkout && ! -d $dir) {
-				warn "mr $action: $dir missing after checkout\n";;
+				awarn($action, "$dir missing after checkout");;
 				return FAILED;
 			}
 
@@ -854,11 +865,11 @@ sub hook {
 	}
 	if ($ret != 0) {
 		if (($? & 127) == 2) {
-			warn "mr $hook: interrupted\n";
+			awarn($hook, "interrupted");
 			return ABORT;
 		}
 		elsif ($? & 127) {
-			warn "mr $hook: received signal ".($? & 127)."\n";
+			awarn($hook, "received signal " . ($? & 127));
 			return ABORT;
 		}
 		else {
@@ -982,7 +993,7 @@ sub showstats {
 			print "mr $action: (skipped: ".join(" ", @skipped).")\n" unless $verbosity == 0;
 		}
 		if (@failed) {
-			warn "mr $action: (failed: ".join(" ", @failed).")\n";
+			awarn($action, "(failed: " . join(" ", @failed) . ")");
 		}
 	}
 }
@@ -1275,8 +1286,8 @@ sub register_repo_names {
 					my $this_config = $configfiles{$dir};
 					my $prev_config = $configfiles{$prev_dir};
 					s/^$ENV{HOME}/~/ for $prev_config, $prev_section, $this_config, $section;
-					die <<EOF;
-mr error: attempted to set '$name' for:
+					error(<<EOF);
+attempted to set '$name' for:
 
   $section via $this_config
 
@@ -1284,6 +1295,7 @@ but was already defined for:
 
   $prev_section via $prev_config
 EOF
+					exit 1;
 				}
 			}
 			else {
@@ -1293,8 +1305,8 @@ EOF
 					my $this_config = $configfiles{$dir};
 					my $prev_config = $configfiles{$prev_dir};
 					s/^$ENV{HOME}/~/ for $prev_config, $prev_section, $this_config, $section;
-					warn <<EOF;
-mr error: could not allocate unique name '$default_name' for
+					error(<<EOF);
+could not allocate unique name '$default_name' for
 
   $section via $this_config
 
@@ -1304,7 +1316,6 @@ since already allocated to
 
 Add a 'name = ...' line if you want to be able to
 reference this repository by name.
-
 EOF
 				}
 				else {
