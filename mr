@@ -652,8 +652,9 @@ sub rcs_test {
 	
 sub findcommand {
 	my ($action, $dir, $topdir, $subdir, $is_checkout) = @_;
-	
+
 	if (exists $config{$topdir}{$subdir}{$action}) {
+		debug(5, "Found specific $action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$action};
 	}
 
@@ -665,6 +666,7 @@ sub findcommand {
 
 	if (defined $rcs && 
 	    exists $config{$topdir}{$subdir}{$rcs."_".$action}) {
+		debug(5, "Found specific ${rcs}_$action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$rcs."_".$action};
 	}
 	else {
@@ -775,6 +777,8 @@ sub action {
 		return FAILED;
 	}
 	elsif (! defined $command) {
+		debug(5, "Didn't find $action command for $subdir in $topdir");
+
 		my $rcs=rcs_test(@_);
 		if (! defined $rcs) {
 			awarn($action, "unknown repository type and no defined $action command for $fulldir");
