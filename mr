@@ -661,8 +661,9 @@ sub vcs_test {
 	
 sub findcommand {
 	my ($action, $dir, $topdir, $subdir, $is_checkout) = @_;
-	
+
 	if (exists $config{$topdir}{$subdir}{$action}) {
+		debug(5, "Found specific $action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$action};
 	}
 
@@ -674,6 +675,7 @@ sub findcommand {
 
 	if (defined $vcs && 
 	    exists $config{$topdir}{$subdir}{$vcs."_".$action}) {
+		debug(5, "Found specific ${vcs}_$action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$vcs."_".$action};
 	}
 	else {
@@ -784,6 +786,8 @@ sub action {
 		return FAILED;
 	}
 	elsif (! defined $command) {
+		debug(5, "Didn't find $action command for $subdir in $topdir");
+
 		my $vcs=vcs_test(@_);
 		if (! defined $vcs) {
 			awarn($action, "unknown repository type and no defined $action command for $fulldir");
