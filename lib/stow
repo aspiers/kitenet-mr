@@ -101,7 +101,7 @@ lib =
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_stow_symlink_exists
-        command "$STOW" $stow_common_opts "$MR_NAME"
+        command "$STOW" $stow_common_opts "$@" "$MR_NAME"
         info "Stowed $MR_NAME"
     }
     mr_restow_if_already_stowed () {
@@ -110,13 +110,13 @@ lib =
             info "$MR_REPO wasn't stowed yet; won't restow."
             return
         fi
-        mr_restow_regardless
+        mr_restow_regardless "$@"
     }
     mr_restow_regardless () {
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_stow_symlink_exists
-        command "$STOW" -R $stow_common_opts "$MR_NAME"
+        command "$STOW" -R $stow_common_opts "$@" "$MR_NAME"
         info "Restowed $MR_NAME"
     }
     mr_unstow () {
@@ -126,7 +126,7 @@ lib =
             info "$MR_REPO wasn't stowed yet in $STOW_PKG_PATH; can't unstow."
             return
         fi
-        command "$STOW" -D $stow_common_opts "$MR_NAME"
+        command "$STOW" -D $stow_common_opts "$@" "$MR_NAME"
         rm -f "$STOW_PKG_PATH"
         info "Unstowed $MR_NAME"
     }
@@ -166,9 +166,9 @@ post_checkout = mr_stow
 post_update   = mr_restow_regardless
 
 # Manual actions
-stow          = mr_stow
-unstow        = mr_unstow
-restow        = mr_restow_regardless
+stow          = mr_stow "$@"
+unstow        = mr_unstow "$@"
+restow        = mr_restow_regardless "$@"
 
 # Local variables:
 # mode: sh
