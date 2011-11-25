@@ -2077,6 +2077,7 @@ veracity_test  = perl: -d "$ENV{MR_REPO}/.sgdrawer"
 
 svn_update = svn update "$@"
 git_update = git pull "$@"
+git_fetch  = git fetch "$@"
 bzr_update = 
 	if is_bzr_checkout; then
 		bzr update "$@"
