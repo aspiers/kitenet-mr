@@ -1137,7 +1137,7 @@ sub repo_filtered {
 		return 1;
 	}
 
-	debug(4, "Allowing selected repo '$name' via -r / --repos\n");
+	debug(3, "Allowing selected repo '$name' via -r / --repos\n");
 	return 0;
 }
 
@@ -1422,7 +1422,7 @@ sub loadconfig {
 		$line++;
 		chomp;
 		if (/^$INCLUDE_STRING (.+)$/) {
-			debug(4, "Include from $1\n");
+			debug(3, "Include from $1\n");
 			next;
 		}
 		next if /^\s*\#/ || /^\s*$/;
@@ -1945,14 +1945,13 @@ sub exitstats {
 sub main {
 	my @orig_ARGV = @ARGV;
 	getopts();
-	debug(4, "mrconfig invoked with args: @orig_ARGV\n");
 	init();
 
 	startingconfig();
-	debug(4, "loading ~/.mrconfig\n");
+	debug(3, "loading ~/.mrconfig\n");
 	loadconfig($HOME_MR_CONFIG);
 	if ($ENV{MR_CONFIG} ne $HOME_MR_CONFIG) {
-		debug(4, "loading \$MR_CONFIG\n");
+		debug(3, "loading \$MR_CONFIG\n");
 		loadconfig($ENV{MR_CONFIG});
 	}
 	register_repo_names();
