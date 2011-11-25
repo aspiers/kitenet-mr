@@ -96,6 +96,12 @@ lib =
             *)
                 ;;
         esac
+        if [ -n "$MR_STOW_OPTIONS" ]; then
+            stow_common_opts="$stow_common_opts $MR_STOW_OPTIONS"
+        fi
+        if [ -n "$MR_STOW_OVER" ]; then
+            stow_common_opts="$stow_common_opts --override=$MR_STOW_OVER"
+        fi
     }
     #
     mr_stow () {
@@ -168,8 +174,10 @@ post_update   = mr_restow_regardless
 
 # Manual actions
 stow          = mr_stow "$@"
+stowover      = MR_STOW_OVER=. mr_stow "$@"
 unstow        = mr_unstow "$@"
 restow        = mr_restow_regardless "$@"
+restowover    = MR_STOW_OVER=. mr_restow_regardless "$@"
 
 # Local variables:
 # mode: sh
