@@ -539,6 +539,18 @@ use constant {
 	ABORT => 3,
 };
 
+use constant COLORS => {
+	black	=> 0,
+	red	=> 1,
+	green	=> 2,
+	yellow	=> 3,
+	blue	=> 4,
+	magenta => 5,
+	cyan	=> 6,
+	white	=> 7,
+};
+
+
 # configurables
 my $config_overridden=0;
 my $verbosity=length $ENV{MR_DEFAULT_VERBOSITY} ? $ENV{MR_DEFAULT_VERBOSITY} : 2;
@@ -583,7 +595,19 @@ sub awarn {
 
 sub error {
 	my ($message) = @_;
-	warn "mr error: $message\n";
+	warn color('red', "mr error: $message\n");
+}
+
+sub color {
+	my $color=shift;
+	my $msg=shift;
+
+	return $msg unless $color && defined $msg && -t 1;
+	my $bold = $color =~ s/\s*bold\s*//i;
+	die "Unrecognised color $color\n" unless COLORS->{$color};
+	my $on =  sprintf "\e[%s3%sm", $bold ? '1;' : '', COLORS->{$color};
+	my $off = "\e[0m";
+	return "$on$msg$off";
 }
 
 my %rcs;
@@ -716,7 +740,7 @@ sub action {
 						return FAILED;
 					}
 				}
-				debug(3, "mr $action: skip $dir skipped\n");
+				debug(2, "mr $action: " . color('yellow', "skipped $dir\n"));
 				return SKIPPED;
 			}
 		}
@@ -725,7 +749,8 @@ sub action {
 	if ($is_checkout) {
 		if (! $force_checkout) {
 			if (-d $dir) {
-				debug(3, "mr $action: $dir already exists, skipping checkout\n");
+				debug(3, "mr $action: " .
+				      color('yellow', "$dir already exists, skipping checkout\n"));
 				return SKIPPED;
 			}
 	
@@ -771,7 +796,7 @@ sub action {
 			$actionmsg="mr $action: $fulldir";
 			$actionmsg.=" (in subdir $s)" if length $s;
 		}
-		debug(1, "$actionmsg\n");
+		debug(1, color('bold white', "$actionmsg\n"));
 
 		my $hookret=hook("pre_$action", $topdir, $subdir);
 		return $hookret if $hookret != OK;
@@ -974,25 +999,25 @@ sub showstats {
 	if (! @ok && ! @failed && ! @skipped) {
 		die "mr $action: no repositories found to work on\n";
 	}
-	print "mr $action: finished (".join("; ",
-		showstat($#ok+1, "ok", "ok"),
-		showstat($#failed+1, "failed", "failed"),
-		showstat($#skipped+1, "skipped", "skipped"),
-	).")\n" unless $verbosity == 0;
+	my @stats = ( );
+	push @stats, color('green',  showstat($#ok      +1, "ok"     )) if @ok;
+	push @stats, color('red',    showstat($#failed  +1, "failed" )) if @failed;
+	push @stats, color('yellow', showstat($#skipped +1, "skipped")) if @skipped;
+	debug(1, color('bold white', "mr $action: finished")
+	      . " (" . join("; ", @stats) . ")\n");
+
 	if ($stats) {
-		if (@skipped) {
-			print "mr $action: (skipped: ".join(" ", @skipped).")\n" unless $verbosity == 0;
-		}
-		if (@failed) {
-			awarn($action, "(failed: " . join(" ", @failed) . ")");
-		}
+		debug(1, "mr $action: " . color('yellow', "skipped $_") . "\n")
+			foreach @skipped;
+		awarn($action, color('red', "failed $_"))
+			foreach @failed;
 	}
 }
 
 sub showstat {
 	my $count=shift;
 	my $singular=shift;
-	my $plural=shift;
+	my $plural=shift || $singular;
 	if ($count) {
 		return "$count ".($count > 1 ? $plural : $singular);
 	}
