@@ -808,6 +808,7 @@ sub action {
 		my $args = quote_args(@ARGV);
                 $command = wrap_shell_code($command, $lib, $action, 'action', $args);
 		my $ret;
+		my $cwd = getcwd();
 		if ($verbosity == 0) {
 			my $output = qx/$command 2>&1/;
 			$ret = $?;
@@ -818,6 +819,18 @@ sub action {
 		}
 		else {
 			$ret=system($command);
+		}
+		unless ($is_checkout) {
+			# Some actions (e.g. update) might want to
+			# recreate the repo directory from scratch, in
+			# which case we need to chdir to the new
+			# inode, in order to avoid warnings
+			# like: "shell-init: error retrieving current
+			# directory: getcwd: cannot access parent
+			# directories: No such file or directory"
+			chdir $cwd
+				or die "Couldn't restore cwd to $cwd: $!\n"
+				     . "Did $action action remove it?\n";
 		}
 		if ($ret != 0) {
 			if (($? & 127) == 2) {
