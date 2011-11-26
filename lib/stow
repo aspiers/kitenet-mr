@@ -65,8 +65,9 @@ lib =
     : ${STOW_DIR:=$HOME/.STOW}
     : ${STOW_TARGET:=$HOME}
     #
-    [ -d "$STOW_DIR"    ] || mkdir -p "$STOW_DIR"
-    [ -d "$STOW_TARGET" ] || mkdir -p "$STOW_TARGET"
+    if ! [ -d "$STOW_TARGET"    ]; then mkdir -p "$STOW_TARGET"; fi
+    if ! [ -d "$STOW_DIR"       ]; then mkdir -p "$STOW_DIR"   ; fi
+    if ! [ -f "$STOW_DIR/.stow" ]; then touch "$STOW_DIR/.stow"; fi
     #
     #MR_STOWABLE=no
     is_stowable () {
