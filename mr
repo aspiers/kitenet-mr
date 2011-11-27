@@ -239,11 +239,45 @@ all repositories, or a manually selected subset.
 =item --verbose[=N]
 
 Control verbosity level.  Defaults to 2.  If the option is used
-with no value for C<N> then c<N> defaults to 4.
+with no value for C<N> then c<N> defaults to 3.
 
-Level 0 will suppress mr's usual output, as well as any output from
-commands that are run (including stderr output). If a command fails,
-the output will be shown.
+Level >= 0 shows failures
+
+Level >= 1 shows:
+
+  * when each action on a repository commences and finishes
+  * statistics of outcomes after all actions terminate
+
+Level >= 2 shows:
+
+  * which are skipped via skip
+  * bootstrap creating .mrconfig
+
+Level >= 3 shows:
+
+  * which repos are selected via C<-r>
+  * when a repo's directory is created on checkout
+  * which mr config files are loaded
+  * loadconfig details
+  * includes
+  * when a repo is skipped due to being outside cwd,
+    or in it but exceeding max depth, or is chosen
+    because it contained the cwd
+
+Level >= 4 shows:
+
+  * when rcs test is run
+  * shell code to be executed, excluding lib code and rcs test
+  * config is loaded
+  * config is included
+  * config is chained
+  * config is loaded during bootstrap
+
+Level >= 5 shows:
+
+  * all shell code to be executed
+  * action definition sources
+  * config file parser internals
 
 =item -q
 
