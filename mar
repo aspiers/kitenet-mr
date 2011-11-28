@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+mar - a convenience wrapper around mr
+
+=head1 SYNOPSIS
+
+    mar checkout foo
+
+    mar update bar baz
+
+    mar diff qux -- -u -X ~/.cvsignore
+
+=head1 DESCRIPTION
+
+B<mar> provides syntactic sugar 
+
+
+=head1 AUTHOR
+
+Copyright 2011 Adam Spiers <mr@adamspiers.org>
+
+Licensed under the GNU GPL version 2 or higher.
+
+=cut
+
+use warnings;
+use strict;
+
+sub usage {
+  warn @_, "\n" if @_;
+
+  (my $ME = $0) =~ s,.*/,,;
+
+  die <<EOUSAGE;
+Usage: $ME ACTION REPO [REPO ...] [-- ARGS ...]
+Options:
+  -h, --help           Show this help
+  -v, --verbose[=N]    Increase [specify] verbosity (defaults to 1)
+  -V, --version        Show version
+options2
+EOUSAGE
+}
+
+
+
+my @repos;
+my @args;
+
+my $action = shift @ARGV;
+
+while (@ARGV) {
+    my $arg = shift @ARGV;
+    if ($arg eq '--') {
+        @args = @ARGV;
+        last;
+    }
+    push @repos, $arg;
+}
+
+exec 'echo', 'mr', '-r', join(",", @repos), $action, @args;
+
