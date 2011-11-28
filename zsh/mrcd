@@ -1,0 +1,18 @@
+#autoload
+
+if [[ "$#" -ne 1 ]]; then
+    echo "Usage: mrcd <repo name>" >&2
+    return 1
+fi
+
+name="$1"
+
+cd
+
+if ! dir=$( mr -r "$name" ls ); then
+    echo "$dir"
+    echo "Is $name a valid repo name?"
+    return 1
+fi
+
+cd $( echo "$dir" | awk '/mr list:/ { print $3; exit 0 } END { exit 1 }' )
