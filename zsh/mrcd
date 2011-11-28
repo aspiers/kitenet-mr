@@ -1,0 +1,25 @@
+#autoload
+
+if [[ "$#" -ne 1 ]]; then
+    echo "Usage: mrcd <repo name>" >&2
+    return 1
+fi
+
+name="$1"
+
+if ! dir=$( cd; MR_DEFAULT_VERBOSITY= mr -r "$name" dir ); then
+    echo "$dir"
+    echo "Is $name a valid repo name?"
+    return 1
+fi
+
+if [[ "$dir" =~ $'\n''- (.+)	(\S+)' ]]; then
+    cd "$match[2]"
+else
+    echo "Could not find dir via mr dir" >&2
+    return 1
+fi
+
+# Local variables:
+# mode: sh
+# End:
