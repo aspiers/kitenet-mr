@@ -426,9 +426,9 @@ note that there is no guarantee that C<MR_NAME> will get set.
 
 =item skip
 
-If the "skip" parameter is set and its command returns true, then B<mr>
-will skip acting on that repository. The command is passed the action
-name in C<$1>.
+If the "skip" parameter is set and its command returns true or sets
+C<MR_SKIP> to a non-empty string, then B<mr> will skip acting on that
+repository. The command is passed the action name in C<$1>.
 
 Here are two examples. The first skips the repo unless
 mr is run by joey. The second uses the hours_since function
@@ -450,6 +450,25 @@ repo, you have to explicitly check it out (e.g. C<mr -r foo checkout>).
   [foo]
   checkout = ...
   skip = lazy
+
+By setting C<MR_SKIP> rather than returning true, it becomes possible
+to compose skip parameters by taking advantage of mr's C<_append>
+feature, e.g.
+
+  [DEFAULT]
+  lib =
+    skip_unless_joey () { if test `whoami` != joey; then MR_SKIP=y; fi; }
+    default_skipper ()  { if ...; then MR_SKIP=y; fo; }
+  skip = default_skipper
+
+  [foo]
+  skip_append = skip_unless_joey
+
+This would not work if the skip functions returned true or false
+rather than setting C<MR_SKIP>, since the shell code is executed with
+C<set -e>, so if one skip function returned false, subsequent skip
+functions contained in the composite block of shell code would never
+be reached.
 
 =item order
 
@@ -525,7 +544,8 @@ you can just add rcs specific actions for it.
 As with the C<lib> parameter, if a parameter is suffixed with
 C<_append>, its value is concatenated to the existing value of the
 parameter for that config block, rather than overwriting it.  In this
-way, actions such as C<fixup> can be constructed accumulatively.
+way, actions such as C<fixup> or C<skip> can be constructed
+accumulatively.
 
 =head1 UNTRUSTED MRCONFIG FILES
 
@@ -779,15 +799,27 @@ sub action {
 					return ABORT;
 				}
 			}
-			if ($ret >> 8 == 0) {
-				if ($testname eq "deleted") {
-					if (-d $dir) {
-						error("$dir should be deleted yet still exists");
-						return FAILED;
-					}
+			my $shell_returned_true = ($ret >> 8 == 0);
+			if ($testname eq "deleted") {
+				if ($shell_returned_true and -d $dir) {
+					error("$dir should be deleted yet still exists");
+					return FAILED;
+				}
+			}
+			elsif ($testname eq "skip") {
+				if ($shell_returned_true) {
 				}
 				debug(2, "mr $action: " . color('yellow', "skipped $dir\n"));
 				return SKIPPED;
+				
+			}
+			if  {
+				else {
+					$skip = 1;
+				}
+			}
+			else {
+				
 			}
 		}
 	}
