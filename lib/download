@@ -1,0 +1,160 @@
+# Download plug-in for Joey Hess' excellent mr tool.
+#
+# This allows tar balls / zip files etc. to be downloaded,
+# unpacked, and used as repositories with minimal effort.
+#
+# Author: Adam Spiers <mr@adamspiers.org>
+
+# INSTALLATION
+# ============
+#
+# To make mr use this file, add a line like this inside the [DEFAULT]
+# section of your ~/.mrconfig:
+#
+#   include = cat /usr/share/mr/download
+#
+# and download this handy shell-script utility which safely unpacks
+# various formats of archive file:
+#
+#   https://raw.github.com/aspiers/shell-env/master/bin/up
+#
+# and place it somewhere in your $PATH.
+#
+# USAGE
+# =====
+#
+# Once the module is installed, you can define repositories like this:
+#
+#   [foo]
+#   checkout = mr_download_checkout http://example.com/foo.tar.bz2
+#
+# This will download the tarball into the parent directory, unpack
+# it into the repository directory, and write an .mrdownload file
+# containing the parameters this module needs in order to be able
+# to re-download it in the future via the 'update' action.
+#
+# If the last segment of the URL does not represent the filename of of
+# an archive (i.e. with a recognisable suffix such as .tar.gz,
+# .tar.bz2, .zip etc.) then mr_download_checkout should be passed an
+# second parameter which is the archive filename it should be
+# downloaded to, e.g.
+#
+#   [fail2ban]
+#   checkout = mr_download_checkout http://sourceforge.net/projects/fail2ban/files/latest/download?source=files fail2ban-latest.tar.bz2
+#
+# Note that it does not matter whether or not all the files in the
+# archive are contained in a top-level directory, or if so, what that
+# top-level directory is named.  The unpacking utility and this module
+# co-operate intelligently to do the right thing, so that you don't
+# have to worry about it.
+#
+# ACTIONS
+# =======
+#
+# Currently only the 'checkout' and 'update' actions are supported.
+#
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# WARNING: the 'update' action deletes the whole unpacked tree!
+# Do not put any files in there which cannot be retrieved from elsewhere.
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+lib =
+    MR_DOWNLOAD_CONFIG_FILE=.mrdownload
+    #
+    mr_download_check_no_existing_file () {
+        if [ -e "$MR_DOWNLOAD_FILE" ]; then
+            error "$MR_DOWNLOAD_FILE already existed; try update instead of checkout"
+        fi
+    }
+    mr_download_check_no_existing_repo () {
+        if [ -e "$MR_REPO" ]; then
+            # This could theoretically happen if something goes wrong
+            # with the rm -rf in download_update.
+            error "$MR_DOWNLOAD_FILE already unpacked; try update instead of checkout"
+        fi
+    }
+    mr_download_check_params () {
+        if [ -z "$MR_DOWNLOAD_URL" ]; then
+            error "$MR_REPO didn't set \$MR_DOWNLOAD_URL"
+        fi
+        if [ -z "$MR_DOWNLOAD_FILE" ]; then
+            MR_DOWNLOAD_FILE="${MR_DOWNLOAD_URL##*/}"
+            #error "$MR_REPO didn't set \$MR_DOWNLOAD_FILE"
+        fi
+    }
+    mr_download () {
+        mr_download_check_no_existing_file
+        if which wget >/dev/null 2>&1; then
+            wget -O "$MR_DOWNLOAD_FILE" "$MR_DOWNLOAD_URL"
+        elif which curl >/dev/null 2>&1; then
+            curl -o "$MR_DOWNLOAD_FILE" "$MR_DOWNLOAD_URL"
+        else
+            error "Neither wget nor curl on \$PATH; aborting."
+        fi
+    }
+    mr_download_write_params () {
+        echo "MR_DOWNLOAD_FILE=\"$MR_DOWNLOAD_FILE\"
+        MR_DOWNLOAD_URL=\"$MR_DOWNLOAD_URL\"" \
+            | sed 's/^ *//' \
+            > "$MR_DOWNLOAD_CONFIG_FILE"
+    }
+    mr_download_and_unpack () {
+        mr_download
+        mr_download_check_no_existing_repo
+        log="$MR_DOWNLOAD_FILE.unpack.log"
+        if ! up "$MR_DOWNLOAD_FILE" 2>&1 | tee "$log"; then
+            error "Failed to unpack $MR_DOWNLOAD_FILE; aborting."
+        fi
+        unpack_dir=$( sed -n '/^Look inside /{s///;p}' "$log" )
+        if [ -z "$unpack_dir" ]; then
+            error "Couldn't determine where $MR_DOWNLOAD_FILE got unpacked to; aborting."
+        fi
+        if ! [ -d "$unpack_dir" ]; then
+            error "$MR_DOWNLOAD_FILE got unpacked to a non-directory?!  Aborting - check $log."
+        fi
+        rm "$log"
+        target_dir="${MR_REPO##*/}"
+        if [ "$unpack_dir" != "$target_dir" ]; then
+            info "Renaming $unpack_dir to $target_dir"
+            mv "$unpack_dir" "$target_dir"
+        fi
+        if ! cd "$MR_REPO"; then
+            error "Couldn't cd to $MR_REPO; something went wrong during unpacking."
+        fi
+    }
+    mr_download_checkout () {
+        MR_DOWNLOAD_URL="$1"
+        MR_DOWNLOAD_FILE="$2"
+        mr_download_check_params
+        mr_download_and_unpack
+        mr_download_write_params
+    }
+    mr_download_read_params () {
+        source "./$MR_DOWNLOAD_CONFIG_FILE"
+    }
+    mr_download_rm_existing () {
+        if [ -e "$MR_DOWNLOAD_FILE" ]; then
+            info "Removing previous download of $MR_DOWNLOAD_FILE"
+            rm -f "$MR_DOWNLOAD_FILE"
+        fi
+    }
+    mr_download_update () {
+        mr_download_read_params
+        mr_download_check_params
+        cd ..
+        mr_download_rm_existing
+        rm -rf "$MR_REPO"
+        mr_download_and_unpack
+        mr_download_write_params
+    }
+
+download_test   = test -e "$MR_REPO/$MR_DOWNLOAD_CONFIG_FILE"
+download_update = mr_download_update
+download_commit = :
+download_diff   = echo "diff not yet implemented for downloaded repos"
+download_log    = :
+download_status = :
+
+# Local variables:
+# mode: sh
+# End:
