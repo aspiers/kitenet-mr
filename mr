@@ -826,18 +826,33 @@ sub action {
 		my $ret=runsh $action, $topdir, $subdir,
 			$command, \@ARGV, sub {
 				my $sh=shift;
+				my $cwd = getcwd();
+				my $ret;
 				if ($quiet) {
 					my $output = qx/$sh 2>&1/;
-					my $ret = $?;
+					$ret = $?;
 					if ($ret != 0) {
 						print "$actionmsg\n";
 						print STDERR $output;
 					}
-					return $ret;
 				}
 				else {
-					system($sh);
+					$ret = system($sh);
 				}
+				unless ($is_checkout) {
+					# Some actions (e.g. update) might want to
+					# recreate the repo directory from scratch, in
+					# which case we need to chdir to the new
+					# inode, in order to avoid warnings
+					# like: "shell-init: error retrieving current
+					# directory: getcwd: cannot access parent
+					# directories: No such file or directory"
+					if (! chdir $cwd) {
+						die "Couldn't restore cwd to $cwd: $!\n"
+						  . "Did $action action remove it?\n";
+					}
+				}
+				return $ret;
 			};
 		if ($ret != 0) {
 			if (($? & 127) == 2) {
