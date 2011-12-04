@@ -1938,7 +1938,7 @@ sub main {
 
 	startingconfig();
 	loadconfig($HOME_MR_CONFIG);
-	loadconfig($ENV{MR_CONFIG});
+	loadconfig($ENV{MR_CONFIG}) unless $ENV{MR_CONFIG} eq $HOME_MR_CONFIG;
 	register_repo_names();
 	#use Data::Dumper; print Dumper(\%config);
 	
