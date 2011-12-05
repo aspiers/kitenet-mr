@@ -1,0 +1,32 @@
+#!/bin/sh
+
+me=`basename $0`
+
+if [ "$#" != 1 ]; then
+    echo "Usage: $me <repo name>" >&2
+    return 1
+fi
+
+name="$1"
+
+MRCACHE=$HOME/.mrcache
+
+if ! [ -e $MRCACHE ]; then
+    if ! mr-recache; then
+        echo "$me: mr-recache failed; aborting." >&1
+        exit 1
+    fi
+fi
+
+dir=$( awk '$1 == "'"$name"'" { print $2; exit 0; }' $MRCACHE )
+if [ -z "$dir" ]; then
+    echo "$me: Could not find repo named '$name' in $MRCACHE; aborting." >&2
+    exit 1
+fi
+
+if ! [ -d "$dir" ]; then
+    echo "$me: Found non-directory $dir for $name in $MRCACHE; aborting." >&2
+    exit 1
+fi
+
+echo "$dir"

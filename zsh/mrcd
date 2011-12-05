@@ -1,0 +1,16 @@
+#autoload
+
+if [ "$#" != 1 ]; then
+    echo "Usage: mrcd <repo name>" >&2
+    return 1
+fi
+
+if dir=$( mrdir "$1" ); then
+    cd "$dir"
+else
+    return 1
+fi
+
+# Local variables:
+# mode: sh
+# End:

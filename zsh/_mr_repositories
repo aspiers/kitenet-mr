@@ -1,0 +1,27 @@
+#compdef mrcd mrdir
+
+MRCACHE=$HOME/.mrcache
+
+if ! [ -e $MRCACHE ]; then
+    if ! mr-recache; then
+        echo "_mr_repositories: mr-recache failed; aborting." >&2
+        return 1
+    fi
+fi
+
+_mr_repositories=( )
+_mr_repository_names=( )
+while read line; do
+    if [[ "$line" =~ '^(.+) +(.+)' ]]; then
+        _mr_repository_names=( "$_mr_repository_names[@]" "$match[1]" )
+        _mr_repositories=( "$_mr_repositories[@]" "$match[2]" )
+    fi
+done < $MRCACHE
+
+local expl
+_description mr_repository_names expl 'mr repository names'
+compadd "$expl[@]" -a _mr_repository_names
+
+# Local variables:
+# mode: sh
+# End:
