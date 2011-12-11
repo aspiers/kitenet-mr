@@ -239,11 +239,13 @@ The value (or the empty string if not specified) is passed to the
 such as the C<lazy> function can determine whether C<mr> is acting on
 all repositories, or a manually selected subset.
 
-=item -v
+=item -v [N]
 
-=item --verbose
+=item --verbose[=N]
 
-Be verbose.
+Control verbosity level.  Defaults to 2, or the value of the
+C<MR_DEFAULT_VERBOSITY> environment variable if set.  If the option is
+used with no value for C<N> then c<N> defaults to 4.
 
 =item -q
 
@@ -567,7 +569,7 @@ use constant {
 
 # configurables
 my $config_overridden=0;
-my $verbose=0;
+my $verbosity=length($ENV{MR_DEFAULT_VERBOSITY} || '') ? $ENV{MR_DEFAULT_VERBOSITY} : 2;
 my $quiet=0;
 my $stats=0;
 my $force=0;
@@ -592,6 +594,16 @@ my %alias;
 my (@ok, @failed, @skipped);
 
 main();
+
+sub abbrev_home {
+	$_[0] =~ s!(^|\s|\e[\d[\d;]+m)$ENV{HOME}/!$1~/!g;
+}
+
+sub debug {
+	my ($level, $output) = @_;
+	abbrev_home($output);
+	print $output if $verbosity >= $level;
+}
 
 sub awarn {
 	my ($action, $message) = @_;
@@ -629,15 +641,15 @@ sub runsh {
 	my $quotedparams=join(" ", (map { shellquote($_) } @$params));
 	my $lib=exists $config{$topdir}{$subdir}{lib} ?
 	               $config{$topdir}{$subdir}{lib}."\n" : "";
-	if ($verbose && (! defined $lastlib || $lastlib ne $lib)) {
-		print "mr library now: >>$lib<<\n";
+	if (! defined $lastlib || $lastlib ne $lib) {
+		debug(5, "mr library now: >>$lib<<");
 		$lastlib=$lib;
 	}
 	my $shellcode="set -e;".$lib.
 		"my_sh(){ $command\n }; my_sh $quotedparams";
-	print "mr $action: running >>$command<< with params >>$quotedparams<<\n" if $verbose;
+	debug(4, "mr $action: running >>$command<< with params >>$quotedparams<<\n");
 	my $ret=$runner->($shellcode);
-	print "mr $action: >>$command<< returned $ret\n" if $verbose;
+	debug(4, "mr $action: >>$command<< returned $ret\n");
 	return $ret;
 }
 
@@ -775,7 +787,7 @@ sub action {
 						return FAILED;
 					}
 				}
-				print "mr $action: skip $dir skipped\n" if $verbose;
+				debug(4, "mr $action: skip $dir skipped\n");
 				return SKIPPED;
 			}
 		}
@@ -785,7 +797,7 @@ sub action {
 		$checkout_dir=$dir;
 		if (! $force_checkout) {
 			if (-d $dir) {
-				print "mr $action: $dir already exists, skipping checkout\n" if $verbose;
+				debug(4, "mr $action: $dir already exists, skipping checkout\n");
 				return SKIPPED;
 			}
 	
@@ -801,7 +813,7 @@ sub action {
 	my $command=findcommand($action, $dir, $topdir, $subdir, $is_checkout);
 
 	if ($is_checkout && ! -d $dir) {
-		print "mr $action: creating parent directory $dir\n" if $verbose;
+		debug(4, "mr $action: creating parent directory $dir\n");
 		system("mkdir", "-p", $dir);
 	}
 
@@ -875,7 +887,7 @@ sub action {
 				awarn($action, "received signal " . ($? & 127));
 				return ABORT;
 			}
-			awarn($action, "failed ($ret)") if $verbose;
+			awarn($action, "failed ($ret)") if $verbosity >= 1;
 			if ($ret >> 8 != 0) {
 				awarn($action, "command failed");
 				if (-e "$ENV{HOME}/.mrlog" && $action ne 'remember') {
@@ -1169,16 +1181,16 @@ sub repo_filtered {
 	my $name = $config{$topdir}{$subdir}{effective_name};
 
 	if (! defined $name) {
-		print "mr: filtering out non-named repo for $subdir\n" if $verbose;
+		debug(4, "mr: filtering out non-named repo for $subdir\n");
 		return 1;
 	}
 
 	if (! $selected{$name}) {
-		print "mr: filtering out repo '$name' via -r / --repos\n" if $verbose;
+		debug(4, "mr: filtering out repo '$name' via -r / --repos\n");
 		return 1;
 	}
 
-	print "mr: allowing selected repo '$name' via -r / --repos\n" if $verbose;
+	debug(4, "mr: allowing selected repo '$name' via -r / --repos\n");
 	return 0;
 }
 
@@ -1539,7 +1551,7 @@ sub loadconfig {
 			}
 
 			if ($parameter eq "include") {
-				print "mr: including output of \"$value\"\n" if $verbose;
+				debug(4, "mr: including output of \"$value\"\n");
 				my @inc=`$value`;
 				if ($?) {
 					warn "mr: include command exited nonzero ($?)\n";
@@ -1836,7 +1848,7 @@ sub register {
 	$command="set -e; ".$config{$directory}{DEFAULT}{lib}."\n".
 		"my_action(){ $command\n }; my_action ".
 		join(" ", map { s/\\/\\\\/g; s/"/\"/g; '"'.$_.'"' } @ARGV);
-	print "mr register: running >>$command<<\n" if $verbose;
+	debug(4, "mr register: running >>$command<<\n");
 	exec($command) || die "exec: $!";
 }
 
@@ -1940,7 +1952,7 @@ sub getopts {
 		"r|repos=s" => \$repos,
 		"p|path" => sub { }, # now default, ignore
 		"f|force" => \$force,
-		"v|verbose" => \$verbose,
+		"v|verbose:4" => \$verbosity,
 		"q|quiet" => \$quiet,
 		"s|stats" => \$stats,
 		"k|insecure" => \$insecure,
