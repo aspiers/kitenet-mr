@@ -1210,16 +1210,16 @@ sub selectrepos {
 		next if repo_filtered($topdir, $subdir);
 
 		my $dir=repodir($repo);
-		my $d=$directory;
+		my $wd=$directory;
 		$dir.="/" unless $dir=~/\/$/;
-		$d.="/" unless $d=~/\/$/;
-		if ($dir ne $d && $dir !~ /^\Q$d\E/) {
+		$wd.="/" unless $wd=~/\/$/;
+		if ($dir ne $wd && $dir !~ /^\Q$wd\E/) {
 			debug(3, "Skipping repo in $dir - working directory $wd didn't contain it\n");
 			next;
 		}
 		if (defined $max_depth) {
 			my @a=split('/', $dir);
-			my @b=split('/', $d);
+			my @b=split('/', $wd);
 			do { } while (@a && @b && shift(@a) eq shift(@b));
 			if (@a > $max_depth) {
 				debug(3, "Skipping repo in $dir - > $max_depth level(s) deeper than $wd\n");
@@ -1242,10 +1242,10 @@ sub selectrepos {
 			next if repo_filtered($topdir, $subdir);
 
 			my $dir=repodir($repo);
-			my $d=$directory;
+			my $wd=$directory;
 			$dir.="/" unless $dir=~/\/$/;
-			$d.="/" unless $d=~/\/$/;
-			if ($d=~/^\Q$dir\E/) {
+			$wd.="/" unless $wd=~/\/$/;
+			if ($wd=~/^\Q$dir\E/) {
 				debug(4, "Including repo in $dir - contained working directory $wd\n");
 				push @repos, [$dir, $topdir, $subdir];
 				last;
