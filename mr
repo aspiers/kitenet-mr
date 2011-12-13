@@ -247,9 +247,43 @@ Control verbosity level.  Defaults to 2, or the value of the
 C<MR_DEFAULT_VERBOSITY> environment variable if set.  If the option is
 used with no value for C<N> then c<N> defaults to 4.
 
-Level 0 will suppress mr's usual output, as well as any output from
-commands that are run (including stderr output). If a command fails,
-the output will be shown.
+Level >= 0 shows failures
+
+Level >= 1 shows:
+
+  * when each action on a repository commences and finishes
+  * statistics of outcomes after all actions terminate
+
+Level >= 2 shows:
+
+  * which are skipped via skip
+  * bootstrap creating .mrconfig
+
+Level >= 3 shows:
+
+  * which repos are selected via C<-r>
+  * when a repo's directory is created on checkout
+  * which mr config files are loaded
+  * loadconfig details
+  * includes
+  * when a repo is skipped due to being outside cwd,
+    or in it but exceeding max depth, or is chosen
+    because it contained the cwd
+
+Level >= 4 shows:
+
+  * when vcs test is run
+  * shell code to be executed, excluding lib code and vcs test
+  * config is loaded
+  * config is included
+  * config is chained
+  * config is loaded during bootstrap
+
+Level >= 5 shows:
+
+  * all shell code to be executed
+  * action definition sources
+  * config file parser internals
 
 =item -q
 
@@ -726,6 +760,7 @@ sub findcommand {
 	my ($action, $dir, $topdir, $subdir, $is_checkout) = @_;
 	
 	if (exists $config{$topdir}{$subdir}{$action}) {
+		debug(5, "Found specific $action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$action};
 	}
 
@@ -737,6 +772,7 @@ sub findcommand {
 
 	if (defined $vcs && 
 	    exists $config{$topdir}{$subdir}{$vcs."_".$action}) {
+		debug(5, "Found specific ${vcs}_$action action for $subdir in $topdir\n");
 		return $config{$topdir}{$subdir}{$vcs."_".$action};
 	}
 	else {
@@ -772,6 +808,7 @@ sub action {
 			my $ret=runsh "$testname test", $topdir, $subdir,
 				$testcommand, [$action],
 				sub { system(shift()) };
+
 			if ($ret != 0) {
 				if (($? & 127) == 2) {
 					awarn($action, "interrupted");
@@ -789,7 +826,7 @@ sub action {
 						return FAILED;
 					}
 				}
-				debug(4, "mr $action: skip $dir skipped\n");
+				debug(3, "mr $action: skip $dir skipped\n");
 				return SKIPPED;
 			}
 		}
@@ -799,7 +836,7 @@ sub action {
 		$checkout_dir=$dir;
 		if (! $force_checkout) {
 			if (-d $dir) {
-				debug(4, "mr $action: $dir already exists, skipping checkout\n");
+				debug(3, "mr $action: $dir already exists, skipping checkout\n");
 				return SKIPPED;
 			}
 	
@@ -815,7 +852,7 @@ sub action {
 	my $command=findcommand($action, $dir, $topdir, $subdir, $is_checkout);
 
 	if ($is_checkout && ! -d $dir) {
-		debug(4, "mr $action: creating parent directory $dir\n");
+		debug(3, "mr $action: creating parent directory $dir\n");
 		system("mkdir", "-p", $dir);
 	}
 
@@ -824,6 +861,8 @@ sub action {
 		return FAILED;
 	}
 	elsif (! defined $command) {
+		debug(5, "Didn't find $action command for $subdir in $topdir");
+
 		my $vcs=vcs_test(@_);
 		if (! defined $vcs) {
 			awarn($action, "unknown repository type and no defined $action command for $fulldir");
@@ -852,6 +891,7 @@ sub action {
 		my $ret=runsh $action, $topdir, $subdir,
 			$command, \@ARGV, sub {
 				my $sh=shift;
+
 				my $cwd = getcwd();
 				my $ret;
 				if ($verbosity == 0) {
@@ -1141,17 +1181,28 @@ sub selectrepos {
 		my $d=$directory;
 		$dir.="/" unless $dir=~/\/$/;
 		$d.="/" unless $d=~/\/$/;
-		next if $dir ne $d && $dir !~ /^\Q$d\E/;
+		if ($dir ne $d && $dir !~ /^\Q$d\E/) {
+			debug(3, "Skipping repo in $dir - working directory $wd didn't contain it\n");
+			next;
+		}
 		if (defined $max_depth) {
 			my @a=split('/', $dir);
 			my @b=split('/', $d);
 			do { } while (@a && @b && shift(@a) eq shift(@b));
-			next if @a > $max_depth || @b > $max_depth;
+			if (@a > $max_depth) {
+				debug(3, "Skipping repo in $dir - > $max_depth level(s) deeper than $wd\n");
+				next;
+			}
+			if (@b > $max_depth) {
+				# FIXME: error out, this should never happen
+				debug(3, "Skipping repo in $dir - $wd > $max_depth level(s) deeper\n");
+				next;
+			}
 		}
 		push @repos, [$dir, $topdir, $subdir];
 	}
 	if (! @repos) {
-		# fallback to find a leaf repo
+		debug(3, "No repos found; falling back to find a leaf repo\n");
 		foreach my $repo (reverse repolist()) {
 			my $topdir=$repo->{topdir};
 			my $subdir=$repo->{subdir};
@@ -1163,6 +1214,7 @@ sub selectrepos {
 			$dir.="/" unless $dir=~/\/$/;
 			$d.="/" unless $d=~/\/$/;
 			if ($d=~/^\Q$dir\E/) {
+				debug(4, "Including repo in $dir - contained working directory $wd\n");
 				push @repos, [$dir, $topdir, $subdir];
 				last;
 			}
@@ -1192,7 +1244,7 @@ sub repo_filtered {
 		return 1;
 	}
 
-	debug(4, "mr: allowing selected repo '$name' via -r / --repos\n");
+	debug(3, "mr: allowing selected repo '$name' via -r / --repos\n");
 	return 0;
 }
 
@@ -1397,6 +1449,11 @@ sub loadconfig {
 	my $dir=shift;
 	my $bootstrap_url=shift;
 
+	my $debug = "loadconfig: " . (ref($f) eq 'GLOB' ? "built-ins" : $f);
+	$debug .= " dir: $dir" if $dir;
+	$debug .= " bootstrap_url: $bootstrap_url" if $bootstrap_url;
+	debug(3, "$debug\n");
+
 	my @toload;
 
 	my $in;
@@ -1504,6 +1561,7 @@ sub loadconfig {
 		next if /^\s*\#/ || /^\s*$/;
 		if (/^\[([^\]]*)\]\s*$/) {
 			$section=$1;
+			debug(5, "got section header: $_\n");
 
 			if (! $trusted) {
 				if (! is_trusted_repo($section) ||
@@ -1530,6 +1588,7 @@ sub loadconfig {
 				chomp $value;
 				$nextline->();
 			}
+			debug(5, "got parameter $parameter for $section: [$value]\n");
 
 			if (! $trusted) {
 				# Untrusted files can only contain a few
@@ -1596,7 +1655,11 @@ sub loadconfig {
 				    length $dir && $section ne "DEFAULT") {
 					my $chaindir="$section";
 					if ($chaindir !~ m!^/!) {
+						debug(4, "chaining to a relative path $chaindir\n");
 						$chaindir=$dir.$chaindir;
+					}
+					else {
+						debug(4, "chaining to an absolute path $chaindir\n");
 					}
 					if (-e "$chaindir/.mrconfig") {
 						my $ret=system($value);
@@ -1625,6 +1688,7 @@ sub loadconfig {
 	}
 
 	foreach my $c (@toload) {
+		debug(4, "chaining to " . join(" / ", @$c) . "\n");
 		loadconfig(@$c);
 	}
 }
@@ -1887,6 +1951,7 @@ sub bootstrap {
 	# would normally be skipped.
 	my $topdir=safe_abs_path(".")."/";
 	my @repo=($topdir, $topdir, ".");
+	debug(4, "special case loadconfig during bootstrap\n");
 	loadconfig($tmpconfig, $topdir, $url);
 	record(\@repo, action("checkout", @repo, 1))
 		if exists $config{$topdir}{"."}{"checkout"};
@@ -1898,10 +1963,12 @@ sub bootstrap {
 		eval q{use File::Copy};
 		die $@ if $@;
 		move($tmpconfig, ".mrconfig") || die "rename: $!";
+		debug(2, "mr bootstrap: saved $url as .mrconfig\n");
 	}
 
 	# Reload the config file (in case we got a different version)
 	# and checkout everything else.
+	debug(4, "reloading config after bootstrap download\n");
 	startingconfig();
 	loadconfig(".mrconfig");
 	dispatch("checkout");
@@ -2013,12 +2080,17 @@ sub exitstats {
 }
 
 sub main {
+	my @orig_ARGV = @ARGV;
 	getopts();
 	init();
 
 	startingconfig();
+	debug(3, "loading ~/.mrconfig\n");
 	loadconfig($HOME_MR_CONFIG);
-	loadconfig($ENV{MR_CONFIG}) unless $ENV{MR_CONFIG} eq $HOME_MR_CONFIG;
+	unless ($ENV{MR_CONFIG} eq $HOME_MR_CONFIG) {
+		debug(3, "loading \$MR_CONFIG\n");
+		loadconfig($ENV{MR_CONFIG});
+	}
 	register_repo_names();
 	#use Data::Dumper; print Dumper(\%config);
 	
