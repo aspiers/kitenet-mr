@@ -635,8 +635,10 @@ sub runsh {
 	}
 	my $shellcode="set -e;".$lib.
 		"my_sh(){ $command\n }; my_sh $quotedparams";
-	print "mr $action: running $action >>$command<<\n" if $verbose;
-	$runner->($shellcode);
+	print "mr $action: running >>$command<< with params >>$quotedparams<<\n" if $verbose;
+	my $ret=$runner->($shellcode);
+	print "mr $action: >>$command<< returned $ret\n" if $verbose;
+	return $ret;
 }
 
 my %perl_cache;
