@@ -1,0 +1,75 @@
+#compdef mr
+
+# TODO:
+#
+# - incorrectly completes after most actions
+# - 'mr remember' should complete in the same way 'mr' does
+
+_mr () {
+  local curcontext="$curcontext" state expl ret=1
+
+  _arguments -s \
+    {-c,--config}'=[mrconfig file]:mrconfig file:_files' \
+    {-d,--directory}'=[top-most directory to work in]:top-most directory:_files -/' \
+    {-f,--force}'[Force mr to act on repositories which would have been skipped]' \
+    {-q,--quiet}'[Suppress output except for failures]' \
+    {-v,--verbose}'[Increase output verbosity]' \
+    {-k,--insecure}'[Accept untrusted SSL certificates when bootstrapping]' \
+    {-s,--stats}'[Expand statistics summary at end of run]' \
+    {-i,--interactive}'[Launch a subshell when failures are encountered]' \
+    {-n,--no-recurse}'=[Do not recurse (deeper than N directories)]:depth:' \
+    {-j,--jobs}'=[Number of jobs to run in parallel]:number of jobs:' \
+    {-t,--trust-all}'[Trust all mrconfig files even if they are not in ~/.mrtrust]' \
+    '*::mr action:->mr actions' \
+    && ret=0
+
+  if ! (( $+_mr_actions )); then
+    _mr_actions_tmp="`mr thisisaninvalidcommand 2>&1`"
+    _mr_actions=(
+      "${(s:, :)${${_mr_actions_tmp#*known actions: }%)}}"
+    )
+  fi
+
+  if [[ -n "$state" ]]; then
+    if (( CURRENT == 1 )); then
+      _wanted commands expl 'mr command' compadd -k _mr_actions && ret=0
+    else
+      case "${words[1]:t}" in
+        config)
+          if (( CURRENT == 2 )); then
+            _message -e mrconfig-section "mrconfig section"
+          elif (( CURRENT == 3 )); then
+            _message -e mrconfig-parameter "mrconfig parameter [and value]"
+          fi
+          ;;
+        run)
+          if (( CURRENT == 2 )); then
+            _path_commands && ret=0
+          else
+            _message -e arguments "command arguments"
+          fi
+          ;;
+        register)
+          _message -e repository 'new repository'
+          ;;
+        bootstrap)
+          if (( CURRENT == 2 )); then
+            _urls && ret=0
+          elif (( CURRENT == 3 )); then
+            _description directories expl "directory to store mrconfig"
+            _files -/ && ret=0
+          fi
+          ;;
+        remember)
+          if (( CURRENT == 2 )); then
+            _wanted commands expl 'mr command' compadd -k _mr_actions && ret=0
+          fi
+          ;;
+      esac
+    fi
+  fi
+
+  return ret
+}
+
+_mr "$@"
