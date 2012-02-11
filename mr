@@ -293,6 +293,11 @@ Level >= 5 shows:
 
 Equivalent to C<-v0>.  Overrides any C<-v> option.
 
+=item --empty
+
+Don't mention the repository in the output unless the action generated
+some output.
+
 =item -k
 
 =item --insecure
@@ -621,6 +626,7 @@ use constant COLORS => {
 my $config_overridden=0;
 my $verbosity=length($ENV{MR_DEFAULT_VERBOSITY} || '') ? $ENV{MR_DEFAULT_VERBOSITY} : 2;
 my $quiet=0;
+my $empty=0;
 my $stats=0;
 my $force=0;
 my $insecure=0;
@@ -919,18 +925,17 @@ sub action {
 				my $sh=shift;
 
 				my $cwd = getcwd();
-				my $ret;
+				my $output = qx/$sh 2>&1/;
+				my $ret = $?;
 				if ($verbosity == 0) {
-					my $output = qx/$sh 2>&1/;
-					$ret = $?;
 					if ($ret != 0) {
 						action_header($actionmsg);
 						warn $output;
 					}
 				}
-				else {
+				elsif (! $empty || length $output) {
 					action_header($actionmsg);
-					$ret = system($sh);
+					print $output;
 				}
 				unless ($is_checkout) {
 					# Some actions (e.g. update) might want to
@@ -2055,6 +2060,7 @@ sub getopts {
 		"f|force" => \$force,
 		"v|verbose:4" => \$verbosity,
 		"q|quiet" => \$quiet,
+		"e|skip-empty" => \$empty,
 		"s|stats" => \$stats,
 		"k|insecure" => \$insecure,
 		"i|interactive" => \$interactive,
