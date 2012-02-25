@@ -10,23 +10,39 @@ fi
 name="$1"
 
 MRCACHE=$HOME/.mrcache
+mr_recached=
 
-if ! [ -e $MRCACHE ]; then
-    if ! mr-recache; then
-        echo "$me: mr-recache failed; aborting." >&1
-        exit 1
-    fi
-fi
-
-dir=$( awk '$1 == "'"$name"'" { print $2; exit 0; }' $MRCACHE )
-if [ -z "$dir" ]; then
-    echo "$me: Could not find repo named '$name' in $MRCACHE; aborting." >&2
+fatal ()
+{
+    echo "Fatal: $me: $*" >&2
     exit 1
+}
+
+mr_recache ()
+{
+    mr-recache || fatal "mr-recache failed; aborting."
+    mr_recached=1
+}
+
+get_dir ()
+{
+    dir=$( awk '$1 == "'"$name"'" { print $2; exit 0; }' $MRCACHE )
+}
+
+[ -e $MRCACHE ] || mrcache
+
+get_dir
+
+if [ -z "$dir" -a -z "$mr_recached" ]; then
+    # Maybe it's a new dir - try recaching
+    mr_recache
+    get_dir
 fi
 
-if ! [ -d "$dir" ]; then
-    echo "$me: Found non-directory $dir for $name in $MRCACHE; aborting." >&2
-    exit 1
-fi
+[ -n "$dir" ] || \
+    fatal "Could not find repo named '$name' in $MRCACHE; aborting."
+
+[ -e "$dir" -a -d "$dir" ] || \
+    fatal "$me: Found non-directory $dir for $name in $MRCACHE; aborting."
 
 echo "$dir"
