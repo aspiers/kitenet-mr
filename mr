@@ -920,6 +920,7 @@ sub action {
 		my $hookret=hook("pre_$action", $topdir, $subdir);
 		return $hookret if $hookret != OK;
 
+		my $is_interactive=is_interactive($action, $topdir, $subdir);
 		my $ret=runsh $action, $topdir, $subdir,
 			$command, \@ARGV, sub {
 				my $sh=shift;
@@ -1001,6 +1002,20 @@ sub action {
 			return OK;
 		}
 	}
+}
+
+sub is_interactive {
+	my ($action, $topdir, $subdir) = @_;
+
+	my $testname = "${action}_is_interactive";
+	my $interactive_test = findcommand($testname, $topdir, $subdir, 0);
+	return 1 unless defined $interactive_test;
+	my $ret = runsh $testname, $topdir, $subdir, $interactive_test, [],
+	    sub {
+		    my $sh = shift;
+		    return `$sh`;
+	    };
+	return $ret == 0;
 }
 
 sub action_header {
