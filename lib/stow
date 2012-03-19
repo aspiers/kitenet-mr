@@ -76,6 +76,7 @@ lib =
     }
     #
     set_stow_common_opts () {
+        : ${STOW_PKG_TYPE:=symlink}
         STOW_PKG_PATH="$STOW_DIR/$MR_NAME"
         stow_common_opts="-t $STOW_TARGET -d $STOW_DIR"
         STOW="${STOW_COMMAND:-stow}"
@@ -97,7 +98,7 @@ lib =
     mr_stow () {
         stowable_then_continue || return 0
         set_stow_common_opts
-        ensure_stow_symlink_exists
+        ensure_package_exists
         command "$STOW" $stow_common_opts "$@" "$MR_NAME"
         info "Stowed $MR_NAME"
     }
@@ -112,7 +113,7 @@ lib =
     mr_restow_regardless () {
         stowable_then_continue || return 0
         set_stow_common_opts
-        ensure_stow_symlink_exists
+        ensure_package_exists
         command "$STOW" -R $stow_common_opts "$@" "$MR_NAME"
         info "Restowed $MR_NAME"
     }
@@ -144,8 +145,22 @@ lib =
         ln -s "$required_target" "$symlink"
     }
     #
-    ensure_stow_symlink_exists () {
-        ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+    ensure_package_exists () {
+        case "$STOW_PKG_TYPE" in
+            symlink)
+                ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+                ;;
+            directory)
+                [ -e "$STOW_PKG_PATH" ] || error "$STOW_PKG_PATH didn't exist; aborting."
+                [ -d "$STOW_PKG_PATH" ] || error "Expected $STOW_PKG_PATH to be a directory; aborting."
+                if [ -L "$STOW_PKG_PATH" ]; then
+                    error "Didn't expect $STOW_PKG_PATH to be a symlink; aborting."
+                fi
+                ;;
+            *)
+                error "Unrecognised value '$STOW_PKG_TYPE' for \$STOW_PKG_TYPE; aborting."
+                ;;
+        esac
     }
 
 #stowable      = is_stowable
