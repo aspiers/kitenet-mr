@@ -1,6 +1,6 @@
 # stow plug-in for Joey Hess' excellent mr tool.
 #
-# This allows using GNU stow as a symlink manager with mr.
+# This allows using GNU Stow as a symlink manager with mr.
 #
 # Author: Adam Spiers <mr@adamspiers.org>
 
@@ -16,36 +16,21 @@
 #
 #   stowable = true
 #
-# Obviously you also need stow installed.  This plug-in assumes that
-# stow is on the PATH, but you can export STOW_COMMAND to override
-# this if it's somewhere else.
+# Obviously you also need Stow installed.  This plug-in assumes that
+# the stow script is somewhere on your $PATH, but you can export
+# STOW_COMMAND to override this if it's somewhere else.
 #
-# It is *strongly* recommended that you put the below snippet in your
-# .mrconfig to get a version of GNU stow which has been specially
-# hacked to integrate nicely with mr.  The last official GNU release
-# was 1.3.3 in January 2002, but there has been an almost complete
-# rewrite since then (version 2.x), and Adam subsequently became
-# co-maintainer and made many further improvements which will be
-# released shortly.
+# At least version 2.1.0 is required[1], but you can easily build the
+# latest from git using the following recipe:
 #
 # --------- 8< --- copy into your ~/.mrconfig ---- 8< ---------
 # [stow]
 # checkout = git_clone git://git.savannah.gnu.org/stow.git
 # fixups =
 #     cd "$MR_REPO"
-#     ./configure --disable-maintainer-mode --prefix=$HOME
+#     ./configure --prefix=$HOME
 #     make install
 # --------- 8< --------- 8< --------- 8< --------- 8< ---------
-#
-# In particular, the 2002 version could create a frankenstein ~/.git/
-# directory containing symlinks to multiple .git/ sub-directories in
-# different stow packages!  The github version does not have this
-# problem - it supports local per-directory .stow-local-ignore and
-# global ~/.stow-global-ignore files, and even without configuration
-# of these, it chooses sensible default ignore lists which prevent
-# stowing of a package's .git/ sub-directory.  These ignore lists are
-# also ideal if you only want to stow a subset of a stow package's
-# contents.
 #
 # The default behaviour is to stow on checkout, and restow on update.
 # The manual actions 'stow', 'restow', and 'unstow' are also
@@ -54,6 +39,16 @@
 # By default, ~/.stow is used as the stow directory, and ~ as the
 # target directory.  You can export STOW_DIR and STOW_TARGET to
 # override these defaults.
+#
+# [1] Older versions could create a frankenstein ~/.git/ directory
+# containing symlinks to multiple .git/ sub-directories in different
+# stow packages!  2.1.0 onwards does not have this problem - it
+# supports local per-directory .stow-local-ignore and global
+# ~/.stow-global-ignore files, and even without configuration of
+# these, it chooses sensible default ignore lists which prevent
+# stowing of a package's .git/ sub-directory.  These ignore lists are
+# also ideal if you only want to stow a subset of a stow package's
+# contents.
 
 lib =
     : ${STOW_DIR:=$HOME/.STOW}
