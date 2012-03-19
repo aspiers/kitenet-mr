@@ -141,7 +141,9 @@ lib =
                 error "Symlink $symlink already points to $actual_target, cannot point to $required_target; aborting."
             fi
         fi
-        [ -e "$symlink" ] && error "Cannot create symlink $symlink - already exists; aborting."
+        if [ -e "$symlink" ]; then
+            error "Cannot create symlink $symlink - already exists; aborting."
+        fi
         ln -s "$required_target" "$symlink"
     }
     #
