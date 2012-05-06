@@ -36,9 +36,30 @@
 # The manual actions 'stow', 'restow', and 'unstow' are also
 # available.
 #
-# By default, ~/.stow is used as the stow directory, and ~ as the
+# By default, ~/.STOW is used as the stow directory, and ~ as the
 # target directory.  You can export STOW_DIR and STOW_TARGET to
 # override these defaults.
+#
+# stowing is automatically performed via post_checkout, and restowing
+# via post_update, as can be seen from below (search for 'Automatic
+# actions').  Note that these run before fixups, which allows fixups
+# to refer to stowed files, but isn't ideal if the fixups are
+# responsible for creating the stow package's installation image,
+# e.g. via a typical './configure && make install' sequence.  Here's a
+# suggested mrconfig chunk to handle this particular use case:
+#
+#     stowable = true
+#     lib =
+#         STOW_PKG_TYPE=directory
+#         STOW_NO_AUTOMATIC_ACTIONS=yes
+#     fixups =
+#         if ! [ -e configure ]; then
+#             bash ./autogen.sh
+#         fi
+#         set_stow_common_opts
+#         ./configure --prefix=$STOW_PKG_PATH
+#         make install
+#         mr_restow_regardless
 #
 # [1] Older versions could create a frankenstein ~/.git/ directory
 # containing symlinks to multiple .git/ sub-directories in different
@@ -61,7 +82,7 @@ lib =
     #MR_STOWABLE=no
     is_stowable () {
         [ -z "$MR_DISABLE_STOW" ] &&
-        mr -r "$MR_NAME" stowable >/dev/null 2>&1
+        ( cd && mr -r "$MR_NAME" stowable >/dev/null 2>&1 )
         #[ "$MR_STOWABLE" = yes ]
     }
     stowable_then_continue () {
@@ -174,11 +195,10 @@ showstowable  =
         echo "$MR_NAME is not stowable"
     fi
 
-# Automatic actions - note that these run before fixups,
-# which allows fixups to refer to stowed files.
-post_checkout_append = mr_stow
+# Automatic actions
+post_checkout_append = [ -n "$STOW_NO_AUTOMATIC_ACTIONS" ] || mr_stow
 #post_update_append   = mr_restow_if_already_stowed
-post_update_append   = mr_restow_regardless
+post_update_append   = [ -n "$STOW_NO_AUTOMATIC_ACTIONS" ] || mr_restow_regardless
 
 # Manual actions
 stow          = mr_stow "$@"
