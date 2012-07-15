@@ -1,4 +1,8 @@
 #!/bin/sh
 
+cache=$HOME/.mrcache
+tmp=$cache.new
+
 cd
-MR_DEFAULT_VERBOSITY= mr dir 2>&1 | awk '/^- / { print $2 " " $3 }' > ~/.mrcache
+MR_DEFAULT_VERBOSITY= mr dir 2>&1 | awk '/^- / { print $2 " " $3 }' > $tmp && \
+    mv $tmp $cache
