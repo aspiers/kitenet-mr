@@ -52,13 +52,20 @@
 #     lib =
 #         STOW_PKG_TYPE=directory
 #         STOW_NO_AUTOMATIC_ACTIONS=yes
+#         mr_pre_unstow () {
+#             install-info --delete --info-dir=$HOME/share/info $STOW_PKG_PATH/share/info/*.info
+#         }
+#         mr_post_stow () {
+#             install-info --info-dir=$HOME/share/info $STOW_PKG_PATH/share/info/*.info
+#         }
 #     fixups =
 #         if ! [ -e configure ]; then
 #             bash ./autogen.sh
 #         fi
 #         set_stow_common_opts
 #         ./configure --prefix=$STOW_PKG_PATH
-#         make install
+#         make install prefix=$STOW_PKG_PATH
+#         rm $STOW_PKG_PATH/share/info/dir
 #         mr_restow_regardless
 #
 # [1] Older versions could create a frankenstein ~/.git/ directory
@@ -121,6 +128,7 @@ lib =
         set_stow_common_opts
         ensure_package_exists
         command "$STOW" $stow_common_opts "$@" "$MR_NAME"
+        mr_post_stow
         info "Stowed $MR_NAME"
     }
     mr_restow_if_already_stowed () {
@@ -135,8 +143,18 @@ lib =
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_package_exists
+        mr_pre_unstow
         command "$STOW" -R $stow_common_opts "$@" "$MR_NAME"
+        mr_post_stow
         info "Restowed $MR_NAME"
+    }
+    mr_pre_unstow () {
+        : # This can be "overridden" by the lib section of a repo definition
+        #info "no mr_pre_unstow hook"
+    }
+    mr_post_stow () {
+        : # This can be "overridden" by the lib section of a repo definition
+        #info "no mr_post_stow hook"
     }
     mr_unstow () {
         stowable_then_continue || return 0
@@ -145,6 +163,7 @@ lib =
             info "$MR_REPO wasn't stowed yet in $STOW_PKG_PATH; can't unstow."
             return
         fi
+        mr_pre_unstow
         command "$STOW" -D $stow_common_opts "$@" "$MR_NAME"
         if [ "$STOW_PKG_TYPE" = 'symlink' ]; then
             rm -f "$STOW_PKG_PATH"
