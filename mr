@@ -1566,7 +1566,7 @@ sub loadconfig {
 			die "mr: $msg at $f line $lineno, included line: $line\n";
 		}
 		else {
-			die "mr: $msg at $f line $lineno\n";
+			die "mr: $msg at $f line $lineno, line: $line\n";
 		}
 	};
 	my $trusterror = sub {
