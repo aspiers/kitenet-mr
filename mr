@@ -367,7 +367,13 @@ Here is an example F<.mrconfig> file:
 
 The F<.mrconfig> file uses a variant of the INI file format. Lines
 starting with "#" are comments. Values can be continued to the
-following line by indenting the line with whitespace.
+following lines by indenting them with whitespace. If multiple
+continuation lines are present, the whitespace prefix on the first
+continuation line is trimmed from all subsequent continuation lines.
+This allows any indentation within the continuation lines to be
+preserved. Totally empty lines are also allowed within the
+continuation lines if followed by a line containing the same
+whitespace prefix.
 
 The C<DEFAULT> section allows setting default values for the sections that
 come after it.
@@ -2154,9 +2160,43 @@ sub get_continuation_lines {
 	my ($first_indent, $first_line);
 	my $lines = $self->{lines};
 
-	while ($lines && $lines->[0]=~/^\s(.+)/) {
-		$value .= "\n$1";
-		chomp $value;
+	while (@$lines) {
+		my $continuation;
+		if (! defined $first_indent) {
+			if ($lines->[0] =~ /^(\s+)(.+)/s) {
+				$first_indent = $1;
+				$continuation = $2;
+				chomp($first_line = $lines->[0]);
+				debug(6, "got first line: [$first_indent|$continuation]\n");
+			}
+			else {
+				debug(6, "line $self->{lineno} not a continuation\n");
+				last;
+			}
+		}
+		else {
+			if ($lines->[0] =~ /^$first_indent(.+)/s) {
+				debug(6, "line $self->{lineno} matched prefix\n");
+				$continuation = $1;
+			}
+			elsif ($lines->[0] eq "\n") {
+				# Allow blank lines as
+				# part of continuation
+				debug(6, "blank line $self->{lineno}\n");
+				$continuation = "\n";
+			}
+			elsif ($lines->[0] =~ /^[ \t]+/) {
+				(my $prefix = $first_indent) =~ s/\t/<TAB--->/g;
+				$first_line =~ s/\t/<TAB--->/g;
+				$self->nextline;
+				$self->lineerror("didn't contain same whitespace prefix [$prefix] as first continuation line:\n$first_line\n");
+			}
+			else {
+				debug(6, "end continuation\n");
+				last;
+			}
+		}
+		chomp($value .= "\n$continuation");
 		$self->nextline;
 	}
 	$value =~ s/\n+\Z/\n/;
@@ -2402,7 +2442,7 @@ veracity_trusted_checkout = vv clone $url $repo
 
 
 help =
- 	case `uname -s` in
+	case `uname -s` in
 		SunOS)
 		SHOWMANFILE="man -f"
 		;;
