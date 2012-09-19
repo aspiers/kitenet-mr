@@ -1541,53 +1541,13 @@ sub loadconfig {
 	close $in unless ref $f eq 'GLOB';
 
 	my $section;
-
-	# Keep track of the current line in the config file;
-	# when a file is included track the current line from the include.
-	my $lineno=0;
-	my $included=undef;
-
-	my $line;
-	my $nextline = sub {
-		if ($included) {
-			$included--;
-		}
-		else {
-			$included=undef;
-			$lineno++;
-		}
-		$line=shift @lines;
-		chomp $line;
-		return $line;
-	};
-	my $lineerror = sub {
-		my $msg=shift;
-		if (defined $included) {
-			die "mr: $msg at $f line $lineno, included line: $line\n";
-		}
-		else {
-			die "mr: $msg at $f line $lineno, line: $line\n";
-		}
-	};
-	my $trusterror = sub {
-		my $msg=shift;
-	
-		if (defined $bootstrap_url) {
-			die "mr: $msg in untrusted $bootstrap_url line $lineno\n".
-				"(To trust this url, --trust-all can be used; but please use caution;\n".
-				"this can allow arbitrary code execution!)\n";
-		}
-		else {
-			die "mr: $msg in untrusted $f line $lineno\n".
-				"(To trust this file, list it in ~/.mrtrust.)\n";
-		}
-	};
+	my $lr = LineReader->new($f, \@lines, $bootstrap_url);
 
 	while (@lines) {
-		$_=$nextline->();
+		$_ = $lr->nextline;
 
 		if (! $trusted && /[[:cntrl:]]/) {
-			$trusterror->("illegal control character");
+			$lr->trusterror("illegal control character");
 		}
 
 		next if /^\s*\#/ || /^\s*$/;
@@ -1599,7 +1559,7 @@ sub loadconfig {
 				if (! is_trusted_repo($section) ||
 				    $section eq 'ALIAS' ||
 				    $section eq 'DEFAULT') {
-					$trusterror->("illegal section \"[$section]\"");
+					$lr->trusterror("illegal section \"[$section]\"");
 				}
 			}
 			$section=expandenv($section) if $trusted;
@@ -1612,14 +1572,7 @@ sub loadconfig {
 		}
 		elsif (/^(\w+)\s*=\s*(.*)/) {
 			my $parameter=$1;
-			my $value=$2;
-
-			# continued value
-			while (@lines && $lines[0]=~/^\s(.+)/) {
-				$value.="\n$1";
-				chomp $value;
-				$nextline->();
-			}
+			my $value = $lr->get_continuation_lines($2);
 			debug(5, "got parameter $parameter for $section: [$value]\n");
 
 			if (! $trusted) {
@@ -1627,7 +1580,7 @@ sub loadconfig {
 				# settings in specific known-safe formats.
 				if ($parameter eq 'checkout') {
 					if (! is_trusted_checkout($value)) {
-						$trusterror->("illegal checkout command \"$value\"");
+						$lr->trusterror("illegal checkout command \"$value\"");
 					}
 				}
 				elsif ($parameter eq 'order' or $parameter eq 'name') {
@@ -1639,23 +1592,23 @@ sub loadconfig {
 					# safe.
 				}
 				else {
-					$trusterror->("illegal setting \"$parameter=$value\"");
+					$lr->trusterror("illegal setting \"$parameter=$value\"");
 				}
 			}
 
 			if ($parameter eq "include") {
-				debug(4, "mr: including output of >>$value<< from $f line $line\n");
+				debug(4, "mr: including output of >>$value<< from $f line $lr->{line}\n");
 				my @inc=`$value`;
 				if ($?) {
 					warn "mr: include command exited nonzero ($?)\n";
 				}
-				$included += @inc;
+				$lr->{included} += @inc;
 				unshift @lines, @inc;
 				next;
 			}
 
 			if (! defined $section) {
-				$lineerror->("parameter ($parameter) not in section");
+				$lr->lineerror("parameter ($parameter) not in section");
 			}
 			if ($section eq 'ALIAS') {
 				$alias{$parameter}=$value;
@@ -1664,7 +1617,7 @@ sub loadconfig {
 				$config{$dir}{$section}{$parameter}.="\n".$value."\n";
 			}
 			elsif ($parameter eq 'name') {
-				my $where = $f . " line $line";
+				my $where = $f . " line $lr->{line}";
 				if ($section eq 'DEFAULT') {
 					die "$where: name not allowed in DEFAULT section\n";
 				}
@@ -1715,7 +1668,7 @@ sub loadconfig {
 			}
 		}
 		else {
-			$lineerror->("parse error");
+			$lr->lineerror("parse error");
 		}
 	}
 
@@ -1771,6 +1724,8 @@ sub modifyconfig {
 	};
 
 	my $section;
+	my $lr = LineReader->new($f, \@lines);
+
 	while (@lines) {
 		$_=shift(@lines);
 
@@ -1789,14 +1744,7 @@ sub modifyconfig {
 		}
 		elsif (/^(\w+)\s*=\s(.*)/) {
 			my $parameter=$1;
-			my $value=$2;
-
-			# continued value
-			while (@lines && $lines[0]=~/^\s(.+)/) {
-				shift(@lines);
-				$value.="\n$1";
-				chomp $value;
-			}
+			my $value = $lr->get_continuation_lines($2);
 
 			if ($section eq $targetsection) {
 				if (exists $changefields{$parameter}) {
@@ -2132,6 +2080,90 @@ sub main {
 	showstats($action);
 	exitstats();
 }
+
+package LineReader;
+
+sub debug {
+	&main::debug;
+}
+
+sub new {
+	my $class = shift;
+	my ($file, $lines, $bootstrap_url) = @_;
+
+	my $new = bless {
+		file => $file,
+		lines => $lines,
+		bootstrap_url => $bootstrap_url,
+
+		# Keep track of the current line in the config file.
+		lineno => 0,
+
+		# When a file is included track the current line from the include.
+		included => undef,
+	}, $class;
+
+	return $new;
+}
+
+sub nextline {
+	my $self = shift;
+	if ($self->{included}) {
+		$self->{included}--;
+	}
+	else {
+		$self->{included} = undef;
+		$self->{lineno}++;
+	}
+	$self->{line} = shift @{ $self->{lines} };
+	chomp $self->{line};
+	return $self->{line};
+}
+
+sub lineerror {
+	my $self = shift;
+	my $msg = shift;
+	$self->{line} =~ s/\t/<TAB--->/g;
+	if (defined $self->{included}) {
+		die "mr: $msg at $self->{file} line $self->{lineno}, included line:\n$self->{line}\n";
+	}
+	else {
+		die "mr: $msg at $self->{file} line $self->{lineno}, line:\n$self->{line}\n";
+	}
+}
+
+sub trusterror {
+	my $self = shift;
+	my $msg = shift;
+
+	if (defined $self->{bootstrap_url}) {
+		die "mr: $msg in untrusted $self->{bootstrap_url} line $self->{lineno}\n".
+			"(To trust this url, --trust-all can be used; but please use caution;\n".
+			"this can allow arbitrary code execution!)\n";
+	}
+	else {
+		die "mr: $msg in untrusted $self->{file} line $self->{lineno}\n".
+			"(To trust this file, list it in ~/.mrtrust.)\n";
+	}
+}
+
+sub get_continuation_lines {
+	my $self = shift;
+	my $value = shift;
+
+	my ($first_indent, $first_line);
+	my $lines = $self->{lines};
+
+	while ($lines && $lines->[0]=~/^\s(.+)/) {
+		$value .= "\n$1";
+		chomp $value;
+		$self->nextline;
+	}
+	$value =~ s/\n+\Z/\n/;
+	return $value;
+}
+
+package main;
 
 # Finally, some useful actions that mr knows about by default.
 # These can be overridden in ~/.mrconfig.
