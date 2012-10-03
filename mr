@@ -1667,10 +1667,7 @@ sub loadconfig {
 							push @toload, ["$chaindir/.mrconfig", $chaindir];
 						}
 					}
-					else {
-						warn "mr: in $dir, could not chain to $chaindir which did not contain .mrconfig\n";
-					}
-				}
+			        }
 			}
 		}
 		else {
