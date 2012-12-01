@@ -26,7 +26,7 @@
 # Once the module is installed, you can define repositories like this:
 #
 #   [foo]
-#   lib = MR_DOWNLOAD_URL=http://example.com/foo.tar.bz2
+#   lib = mr_set_download_url http://example.com/foo.tar.bz2
 #   checkout = mr_download_checkout
 #
 # This will download the tarball into the parent directory, and
@@ -34,13 +34,13 @@
 #
 # If the last segment of the URL does not represent the filename of an
 # archive (i.e. with a recognisable suffix such as .tar.gz, .tar.bz2,
-# .zip etc.) then a second variable MR_DOWNLOAD_FILE should be set
-# which is the archive filename it should be downloaded to, e.g.
+# .zip etc.) then you should also set the archive filename it should
+# be downloaded to, e.g.
 #
 #   [fail2ban]
 #   lib =
-#       MR_DOWNLOAD_URL=http://sourceforge.net/projects/fail2ban/files/latest/download?source=files
-#       MR_DOWNLOAD_FILE=fail2ban-latest.tar.bz2
+#       mr_set_download_url http://sourceforge.net/projects/fail2ban/files/latest/download?source=files
+#       mr_set_download_file fail2ban-latest.tar.bz2
 #   checkout = mr_download_checkout
 #
 # Note that it does not matter whether or not all the files in the
@@ -60,6 +60,21 @@
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 lib =
+    mr_set_download_url () {
+        MR_DOWNLOAD_URL="$1"
+    }
+    mr_set_download_file () {
+        MR_DOWNLOAD_FILE="$1"
+    }
+    mr_download_check_params () {
+        if [ -z "$MR_DOWNLOAD_URL" ]; then
+            error "$MR_REPO didn't set \$MR_DOWNLOAD_URL"
+        fi
+        if [ -z "$MR_DOWNLOAD_FILE" ]; then
+            MR_DOWNLOAD_FILE="${MR_DOWNLOAD_URL##*/}"
+            #error "$MR_REPO didn't set \$MR_DOWNLOAD_FILE"
+        fi
+    }
     mr_download_check_no_existing_file () {
         if [ -e "$MR_DOWNLOAD_FILE" ]; then
             error "$MR_DOWNLOAD_FILE already existed; try update instead of checkout"
@@ -70,15 +85,6 @@ lib =
             # This could theoretically happen if something goes wrong
             # with the rm -rf in download_update.
             error "$MR_DOWNLOAD_FILE already unpacked; try update instead of checkout"
-        fi
-    }
-    mr_download_check_params () {
-        if [ -z "$MR_DOWNLOAD_URL" ]; then
-            error "$MR_REPO didn't set \$MR_DOWNLOAD_URL"
-        fi
-        if [ -z "$MR_DOWNLOAD_FILE" ]; then
-            MR_DOWNLOAD_FILE="${MR_DOWNLOAD_URL##*/}"
-            #error "$MR_REPO didn't set \$MR_DOWNLOAD_FILE"
         fi
     }
     mr_download () {
