@@ -1579,6 +1579,10 @@ sub loadconfig {
 		elsif (/^(\w+)\s*=\s*(.*)/) {
 			my $parameter=$1;
 			my $value = $lr->get_continuation_lines($2);
+			if (! $section) {
+				die "'$parameter' parameter found outside section at line $lr->{lineno}\n";
+			}
+				
 			debug(5, "got parameter $parameter for $section: [$value]\n");
 
 			if (! $trusted) {
