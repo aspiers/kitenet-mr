@@ -1,0 +1,29 @@
+# Adds support for osc (Open Build Service) projects.
+
+# To make mr use this file, add a line like this inside the [DEFAULT]
+# section of your ~/.mrconfig
+#include = cat /usr/share/mr/osc
+
+osc_update = osc update
+osc_status = osc status -s "$@" || true
+osc_commit = osc commit
+osc_push = :
+osc_diff = osc diff "$@"
+osc_log = osc log "$@"
+
+osc_test = perl:
+	-d "$ENV{MR_REPO}/.osc"
+
+osc_register =
+	apiurl=`cat .osc/_apiurl`
+	project=`cat .osc/_project`
+	if [ -e .osc/_package ]; then
+		package=`cat .osc/_package`
+		echo "Registering osc package $project/$package in $MR_CONFIG"
+		mr -c "$MR_CONFIG" config "`pwd`" checkout="osc -A $apiurl checkout $project $package"
+	else
+		echo "Registering osc project $project in $MR_CONFIG"
+		mr -c "$MR_CONFIG" config "`pwd`" checkout="osc -A $apiurl checkout $project"
+	fi	
+
+# vim:sw=8:sts=0:ts=8:noet
