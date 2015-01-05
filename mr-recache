@@ -1,8 +1,32 @@
-#!/bin/sh
+#!/usr/bin/ruby
 
-cache=$HOME/.mrcache
-tmp=$cache.new
+CACHE = File.join(ENV['HOME'], '.mrcache')
+TMP = CACHE + '.new'
 
-cd
-MR_DEFAULT_VERBOSITY= mr dir 2>&1 | awk '/^- / { print $2 " " $3 }' > $tmp && \
-    mv $tmp $cache
+Dir.chdir ENV['HOME']
+
+current_dir = nil
+got_error = false
+
+File.open(TMP, 'w') do |tmp|
+  IO.popen('mr dir 2>&1') do |lines|
+    lines.each do |line|
+      case line
+      when /^- (.+?)	(.+?)	(.+?)$/
+        name, dir, config = $1, $2, $3
+        tmp.puts "#{name} #{dir}"
+      when /^mr dir: (skipped|failed to chdir to)/
+      when /^mr dir: (~.+)/
+        current_dir = $1
+        $stderr.print line if got_error
+        got_error = false
+      when /^\s*$/
+      else
+        $stderr.print line
+        got_error = true
+      end
+    end
+  end
+end
+
+File.rename TMP, CACHE
