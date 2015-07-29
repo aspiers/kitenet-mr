@@ -104,7 +104,7 @@ lib =
         if ! up "$MR_DOWNLOAD_FILE" 2>&1 | tee "$log"; then
             error "Failed to unpack $MR_DOWNLOAD_FILE; aborting."
         fi
-        unpack_dir=$( sed -n '/^Look inside /{s///;p}' "$log" )
+        unpack_dir=$( tail -n1 "$log" )
         if [ -z "$unpack_dir" ]; then
             error "Couldn't determine where $MR_DOWNLOAD_FILE got unpacked to; aborting."
         fi
