@@ -258,7 +258,6 @@ Level >= 1 shows:
 
 Level >= 2 shows:
 
-  * which are skipped via skip
   * bootstrap creating .mrconfig
 
 Level >= 3 shows:
@@ -283,6 +282,7 @@ Level >= 4 shows:
 
 Level >= 5 shows:
 
+  * which repos are skipped via skip
   * all shell code to be executed
   * action definition sources
   * config file parser internals
@@ -1220,7 +1220,7 @@ sub selectrepos {
 		$dir.="/" unless $dir=~/\/$/;
 		$wd.="/" unless $wd=~/\/$/;
 		if ($dir ne $wd && $dir !~ /^\Q$wd\E/) {
-			debug(3, "Skipping repo in $dir - working directory $wd didn't contain it\n");
+			debug(5, "Skipping repo in $dir - working directory $wd didn't contain it\n");
 			next;
 		}
 		if (defined $max_depth) {
