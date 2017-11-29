@@ -769,9 +769,9 @@ sub vcs_test {
 			push @vcs, $vcs;
 		}
 	}
-
+	debug(4, "VCS for $dir found via Perl: @vcs\n");
 	push @vcs, split(/\n/,
-		runsh("vcs test", $topdir, $subdir, $test, [], sub {
+		runsh("vcs test for $subdir", $topdir, $subdir, $test, [], sub {
 			my $sh=shift;
 			my $ret=`$sh`;
 			return $ret;
@@ -920,7 +920,7 @@ sub action {
 		my $hookret=hook("pre_$action", $topdir, $subdir);
 		return $hookret if $hookret != OK;
 
-		my $ret=runsh $action, $topdir, $subdir,
+		my $ret=runsh "$action for $subdir", $topdir, $subdir,
 			$command, \@ARGV, sub {
 				my $sh=shift;
 
