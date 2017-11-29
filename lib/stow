@@ -89,7 +89,7 @@ lib =
     #MR_STOWABLE=no
     is_stowable () {
         [ -z "$MR_DISABLE_STOW" ] &&
-        ( cd "$MR_REPO" && mr stowable >/dev/null 2>&1 )
+        ( cd "$MR_REPO" && mr --no-recurse stowable >/dev/null 2>&1 )
         #[ "$MR_STOWABLE" = yes ]
     }
     stowable_then_continue () {
