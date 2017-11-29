@@ -192,7 +192,7 @@ lib =
     ensure_package_exists () {
         case "$STOW_PKG_TYPE" in
             symlink)
-                ensure_symlink_exists "$STOW_PKG_PATH" "$MR_REPO"
+                ensure_symlink_exists "$STOW_PKG_PATH" "${STOW_SOURCE_PATH:-$MR_REPO}"
                 ;;
             directory)
                 [ -e "$STOW_PKG_PATH" ] || mkdir "$STOW_PKG_PATH"
