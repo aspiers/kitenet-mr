@@ -283,6 +283,7 @@ Level >= 4 shows:
 Level >= 5 shows:
 
   * which repos are skipped via skip
+  * which repos are filtered out by name
   * all shell code to be executed
   * action definition sources
   * config file parser internals
@@ -1273,12 +1274,12 @@ sub repo_filtered {
 	my $name = $config{$topdir}{$subdir}{effective_name};
 
 	if (! defined $name) {
-		debug(4, "mr: filtering out non-named repo for $subdir\n");
+		debug(5, "mr: filtering out non-named repo for $subdir\n");
 		return 1;
 	}
 
 	if (! $selected{$name}) {
-		debug(4, "mr: filtering out repo '$name' via -r / --repos\n");
+		debug(5, "mr: filtering out repo '$name' via -r / --repos\n");
 		return 1;
 	}
 
