@@ -127,7 +127,8 @@ lib =
         stowable_then_continue || return 0
         set_stow_common_opts
         ensure_package_exists
-        command "$STOW" $stow_common_opts "$@" "$MR_NAME"
+        info $STOW $stow_common_opts "$@" "$MR_NAME"
+        command $STOW $stow_common_opts "$@" "$MR_NAME"
         mr_post_stow
         info "Stowed $MR_NAME"
     }
@@ -144,7 +145,7 @@ lib =
         set_stow_common_opts
         ensure_package_exists
         mr_pre_unstow
-        command "$STOW" -R $stow_common_opts "$@" "$MR_NAME"
+        command $STOW -R $stow_common_opts "$@" "$MR_NAME"
         mr_post_stow
         info "Restowed $MR_NAME"
     }
@@ -164,7 +165,7 @@ lib =
             return
         fi
         mr_pre_unstow
-        command "$STOW" -D $stow_common_opts "$@" "$MR_NAME"
+        command $STOW -D $stow_common_opts "$@" "$MR_NAME"
         if [ "$STOW_PKG_TYPE" = 'symlink' ]; then
             rm -f "$STOW_PKG_PATH"
         fi
