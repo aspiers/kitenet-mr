@@ -1,48 +1,94 @@
 #!/bin/sh
 
 me=`basename $0`
-
-if [ "$#" != 1 ]; then
-    echo "Usage: $me <repo name>" >&2
-    exit 1
-fi
-
-name="$1"
-
-MRCACHE=$HOME/.mrcache
 mr_recached=
+MRCACHE=$HOME/.mrcache
 
-fatal ()
-{
+fatal () {
     echo "Fatal: $me: $*" >&2
     exit 1
 }
 
-mr_recache ()
-{
+mr_recache () {
     mr-recache || fatal "mr-recache failed; aborting."
     mr_recached=1
 }
 
-get_dir ()
-{
+get_dir () {
+    local name="$1"
     dir=$( awk '$1 == "'"$name"'" { print $2; exit 0; }' $MRCACHE )
 }
 
-[ -e $MRCACHE ] || mrcache
+get_name () {
+    local dir="$1"
+    name=$( awk '$2 == "'"$dir"'" { print $1; exit 0; }' $MRCACHE )
+}
 
-get_dir
+get_dir_safe () {
+    local name="$1"
+    get_dir "$name"
 
-if [ -z "$dir" -a -z "$mr_recached" ]; then
-    # Maybe it's a new dir - try recaching
-    mr_recache
-    get_dir
-fi
+    if [ -z "$dir" -a -z "$mr_recached" ]; then
+        # Maybe it's a new repo - try recaching
+        mr_recache
+        get_dir "$name"
+    fi
 
-[ -n "$dir" ] || \
-    fatal "Could not find repo named '$name' in $MRCACHE; aborting."
+    [ -n "$dir" ] || \
+        fatal "Could not find repo named '$name' in $MRCACHE; aborting."
 
-[ -e "$dir" -a -d "$dir" ] || \
-    fatal "$me: Found non-directory $dir for $name in $MRCACHE; aborting."
+    [ -e "$dir" -a -d "$dir" ] || \
+        fatal "$me: Found non-directory $dir for $name in $MRCACHE; aborting."
 
-echo "$dir"
+    echo "$dir"
+}
+
+get_name_safe () {
+    dir="$1"
+    get_name "$dir"
+
+    if [ -z "$name" -a -z "$mr_recached" ]; then
+        # Maybe it's a new repo - try recaching
+        mr_recache
+        get_name "$dir"
+    fi
+
+    [ -n "$name" ] || \
+        fatal "Could not find repo $dir in $MRCACHE; aborting."
+
+    echo "$name"
+}
+
+main () {
+    [ -e $MRCACHE ] || mrcache
+
+    case "$me" in
+        mrdir)
+            if [ "$#" != 1 ]; then
+                echo "Usage: $me <repo name>" >&2
+                exit 1
+            fi
+
+            get_dir_safe "$1"
+            ;;
+        mrname)
+            if [ "$#" = 0 ]; then
+                if ! dir=`git root`; then
+                    fatal "Failed to guess git root of cwd"
+                fi
+            elif [ "$#" != 1 ]; then
+                echo "Usage: $me [<repo path>]" >&2
+                exit 1
+            else
+                dir="$1"
+            fi
+
+            get_name_safe "$dir"
+            ;;
+        *)
+            fatal "$0: Unrecognised mode $me"
+            ;;
+    esac
+}
+
+main "$@"
