@@ -1,7 +1,6 @@
 #!/bin/sh
 
 me=`basename $0`
-mr_recached=
 MRCACHE=$HOME/.mrcache
 
 fatal () {
@@ -11,7 +10,7 @@ fatal () {
 
 mr_recache () {
     mr-recache || fatal "mr-recache failed; aborting."
-    mr_recached=1
+    MR_AVOID_RECACHE=1
 }
 
 get_dir () {
@@ -28,7 +27,7 @@ get_dir_safe () {
     local name="$1"
     get_dir "$name"
 
-    if [ -z "$dir" -a -z "$mr_recached" ]; then
+    if [ -z "$dir" -a -z "$MR_AVOID_RECACHE" ]; then
         # Maybe it's a new repo - try recaching
         mr_recache
         get_dir "$name"
@@ -47,7 +46,7 @@ get_name_safe () {
     dir="$1"
     get_name "$dir"
 
-    if [ -z "$name" -a -z "$mr_recached" ]; then
+    if [ -z "$name" -a -z "$MR_AVOID_RECACHE" ]; then
         # Maybe it's a new repo - try recaching
         mr_recache
         get_name "$dir"
