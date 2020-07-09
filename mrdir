@@ -73,7 +73,7 @@ main () {
             ;;
         mrname)
             if [ "$#" = 0 ]; then
-                if ! dir=`git root`; then
+                if ! dir=$(cd "`git root`"; pwd -P); then
                     fatal "Failed to guess git root of cwd"
                 fi
             elif [ "$#" != 1 ]; then
