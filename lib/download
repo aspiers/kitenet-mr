@@ -63,6 +63,8 @@ lib =
     mr_set_download_url () {
         MR_DOWNLOAD_URL="$1"
     }
+    # In the future, for downloads which redirect to versioned filenames,
+    # potentially we could use wget --trust-server-names and some smarter logic.
     mr_set_download_file () {
         MR_DOWNLOAD_FILE="$1"
     }
