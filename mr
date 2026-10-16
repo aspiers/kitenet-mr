@@ -2494,6 +2494,10 @@ remember =
 # Output repo details in a machine-readable format
 dir = echo "- ${MR_NAME:-(unnamed)}	$MR_REPO	$MR_CONFIG"
 
+# Like dir, but with the repo's one-line purpose, if its lib sets
+# MR_DESCRIPTION, instead of the config file
+describe = echo "- ${MR_NAME:-(unnamed)}	$MR_REPO	${MR_DESCRIPTION:-}"
+
 ed = echo "A horse is a horse, of course, of course.."
 T = echo "I pity the fool."
 right = echo "Not found."
