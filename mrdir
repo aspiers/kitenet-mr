@@ -2,6 +2,7 @@
 
 me=`basename $0`
 MRCACHE=$HOME/.mrcache
+MRDESC=$HOME/.mrdesc
 
 fatal () {
     echo "Fatal: $me: $*" >&2
@@ -21,6 +22,26 @@ get_dir () {
 get_name () {
     local dir="$1"
     name=$( awk '$2 == "'"$dir"'" { print $1; exit 0; }' $MRCACHE )
+}
+
+# Exits non-zero if the repo isn't in the cache; a repo without a
+# description prints nothing.
+get_desc () {
+    awk -F'\t' -v name="$1" '$1 == name { print $2; found = 1; exit } END { exit !found }' $MRDESC
+}
+
+get_desc_safe () {
+    local name="$1"
+
+    get_desc "$name" && return
+
+    if [ -z "$MR_AVOID_RECACHE" ]; then
+        # Maybe it's a new repo - try recaching
+        mr_recache
+        get_desc "$name" && return
+    fi
+
+    fatal "Could not find repo named '$name' in $MRDESC; aborting."
 }
 
 get_dir_safe () {
@@ -59,7 +80,7 @@ get_name_safe () {
 }
 
 main () {
-    [ -e $MRCACHE ] || mrcache
+    [ -e $MRCACHE -a -e $MRDESC ] || mr_recache
 
     case "$me" in
         mrdir)
@@ -69,6 +90,14 @@ main () {
             fi
 
             get_dir_safe "$1"
+            ;;
+        mrdesc)
+            if [ "$#" != 1 ]; then
+                echo "Usage: $me <repo name>" >&2
+                exit 1
+            fi
+
+            get_desc_safe "$1"
             ;;
         mrname)
             if [ "$#" = 0 ]; then

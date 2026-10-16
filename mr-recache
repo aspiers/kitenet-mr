@@ -1,32 +1,39 @@
 #!/usr/bin/ruby
 
+# One mr run caches each repo's directory in ~/.mrcache (for mrdir and
+# mrname) and its description in ~/.mrdesc (for mrdesc).
+
 CACHE = File.join(ENV['HOME'], '.mrcache')
-TMP = CACHE + '.new'
+DESC = File.join(ENV['HOME'], '.mrdesc')
 
 Dir.chdir ENV['HOME']
 
 current_dir = nil
 got_error = false
 
-File.open(TMP, 'w') do |tmp|
-  IO.popen('mr dir 2>&1') do |lines|
-    lines.each do |line|
-      case line
-      when /^- (.+?)	(.+?)	(.+?)$/
-        name, dir, config = $1, $2, $3
-        tmp.puts "#{name} #{dir}"
-      when /^mr dir: (skipped|failed to chdir to)/
-      when /^mr dir: (~.+)/
-        current_dir = $1
-        $stderr.print line if got_error
-        got_error = false
-      when /^\s*$/
-      else
-        $stderr.print line
-        got_error = true
+File.open(CACHE + '.new', 'w') do |cache|
+  File.open(DESC + '.new', 'w') do |desc|
+    IO.popen('mr describe 2>&1') do |lines|
+      lines.each do |line|
+        case line
+        when /^- (.+?)	(.+?)	(.*)$/
+          name, dir, description = $1, $2, $3
+          cache.puts "#{name} #{dir}"
+          desc.puts "#{name}	#{description}"
+        when /^mr describe: (skipped|failed to chdir to)/
+        when /^mr describe: (~.+)/
+          current_dir = $1
+          $stderr.print line if got_error
+          got_error = false
+        when /^\s*$/
+        else
+          $stderr.print line
+          got_error = true
+        end
       end
     end
   end
 end
 
-File.rename TMP, CACHE
+File.rename CACHE + '.new', CACHE
+File.rename DESC + '.new', DESC
